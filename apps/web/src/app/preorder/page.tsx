@@ -10,7 +10,28 @@ export const metadata: Metadata = {
 const deposit = (PRICING.preorder.oneTimeCents / 100).toFixed(0);
 const monthly = (PRICING.founding.monthlyCents / 100).toFixed(0);
 
-export default function PreorderPage() {
+// UTM + referrer search params are preserved as Stripe metadata by appending
+// them to the Payment Link URL. Stripe forwards them to checkout.session.completed.
+type PageProps = {
+  searchParams: Promise<{
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    ref?: string;
+    email?: string;
+  }>;
+};
+
+export default async function PreorderPage({ searchParams }: PageProps) {
+  const sp = await searchParams;
+  const base = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK ?? "";
+  const url = new URL(base || "https://creatorlens.app/preorder");
+  if (sp.email) url.searchParams.set("prefilled_email", sp.email);
+  // Stripe Payment Links do not accept arbitrary query metadata — utm/ref are
+  // captured on the thanks page instead and reconciled against the session.
+
+  const checkoutHref = base ? url.toString() : undefined;
+
   return (
     <main className="relative mx-auto flex min-h-[80dvh] max-w-xl flex-col items-center justify-center px-6 py-16">
       <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-bg-elevated px-3 py-1 text-xs text-fg-muted">
@@ -18,38 +39,39 @@ export default function PreorderPage() {
         Founding spots are limited
       </div>
 
-      <h1 className="mb-4 text-center font-display text-4xl font-bold tracking-tight">
+      <h1 className="mb-4 text-center font-display text-4xl font-bold tracking-tight sm:text-5xl">
         Reserve your <span className="text-accent">Lens</span>.
       </h1>
-      <p className="mb-8 max-w-md text-center text-fg-muted">
+      <p className="mb-10 max-w-md text-center text-fg-muted">
         ${deposit} deposit — credited toward your first month. Locks in{" "}
         <strong className="text-fg">${monthly}/mo forever</strong>. Refundable
         until your container is provisioned.
       </p>
 
-      <form
-        action="/api/preorder/checkout"
-        method="POST"
-        className="flex w-full flex-col gap-3"
-      >
-        <label className="text-sm text-fg-muted">
-          Your email
-          <input
-            name="email"
-            type="email"
-            required
-            placeholder="you@yourcreatorlife.com"
-            className="mt-2 w-full rounded-lg border border-border bg-bg-elevated px-4 py-3 text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
-          />
-        </label>
-        <button type="submit" className="btn-primary mt-2" disabled>
+      {checkoutHref ? (
+        <a href={checkoutHref} className="btn-primary w-full max-w-sm text-base">
           Continue to Stripe — ${deposit}
+        </a>
+      ) : (
+        <button className="btn-primary w-full max-w-sm text-base opacity-50" disabled>
+          Checkout temporarily unavailable
         </button>
-        <p className="text-center text-xs text-fg-subtle">
-          Checkout wiring ships in the next deploy. Form is live but the submit
-          is disabled for a few hours while we finish plumbing.
-        </p>
-      </form>
+      )}
+
+      <ul className="mt-10 space-y-3 text-sm text-fg-muted">
+        <li className="flex items-start gap-3">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+          <span>Founding pricing locks in the day you deposit — never goes up.</span>
+        </li>
+        <li className="flex items-start gap-3">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+          <span>Full refund anytime before your container is provisioned.</span>
+        </li>
+        <li className="flex items-start gap-3">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+          <span>Vanguard creators get it free — log in with your Vanguard email.</span>
+        </li>
+      </ul>
 
       <div className="mt-10 text-center">
         <Link href="/" className="text-sm text-fg-muted hover:text-fg">

@@ -31,9 +31,9 @@ pnpm-debug.log*
 .turbo
 
 # supabase
-supabase/.temp/
-supabase/.env
-supabase/.branches/
+**/supabase/.temp/
+**/supabase/.env
+**/supabase/.branches/
 
 # runtime / coverage
 coverage/
@@ -42,3 +42,6 @@ coverage/
 # local data
 *.sqlite
 *.sqlite-journal
+
+# Local dev env (contains service-role key)
+apps/web/.env.local
