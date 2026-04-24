@@ -21,12 +21,15 @@
 | Stripe | product `prod_UOaCGzG5kzxHAY` "CreatorLens Founding Member" + price `price_1TPnWe3WtTvxXWPupNbbRzXe` ($29/mo) | Live ✅ |
 | Stripe | product `prod_UOaCh3PFr9ycIR` "CreatorLens Pre-Order Deposit" + price `price_1TPnWh3WtTvxXWPuxzMcVOd3` ($10 one-time) | Live ✅ |
 | Stripe | 3 ghost products from prior iteration archived (Pro / Creator / Agency) | Archived ✅ |
+| Supabase | project `creatorlens` (`fwufzyjtmufexxezmvvg`), org `Add Ai Pro`, region `us-east-2` | Restored from INACTIVE ✅ |
+| Supabase | 7 new tables + RLS + auth trigger applied via Management API | Applied ✅ |
+| Supabase | `SUPABASE_URL`, `_ANON_KEY`, `_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_*` set on Vercel + Railway | Wired + redeployed ✅ |
 
 ## Known remaining tasks
 
-- **Supabase project** — blocked, needs user access token (`sbp_xxx` from supabase.com/dashboard/account/tokens)
-- **api.creatorlens.app custom domain on Railway** — Railway reports an internal conflict (old project still holds a lease). Manual release via Railway dashboard fixes it.
-- **Stripe webhook secret** — not yet set; wire in Phase 1 when checkout endpoint goes live.
+- **Stripe `sk_live_...` for AddAiPro account** — needed for `/preorders` Checkout endpoint to actually mint sessions. Grab from [dashboard.stripe.com/acct_1SalBz3WtTvxXWPu/apikeys](https://dashboard.stripe.com/acct_1SalBz3WtTvxXWPu/apikeys). Webhook signing secret also needed when we register the live webhook.
+- **api.creatorlens.app custom domain on Railway** — Railway reports an internal conflict (old project still holds a lease). Manual release via Railway dashboard fixes it. Not blocking; raw railway.app URL works.
+- **9 legacy Supabase tables** from prior iteration (`backstage_stats`, `coaching_messages`, `competitor_research`, `free_assessments`, `profiles`, `tiktok_profiles`, `tiktok_videos`, `vanguard_codes`, `video_analyses`) — still present; decide whether to archive/drop.
 - **Anthropic pooled API key, Contabo SSH creds** — needed for Phase 2.
 
 ## Notable build fixes made in Phase 0
