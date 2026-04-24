@@ -1,8 +1,24 @@
 import { BRAND } from "@creatorlens/shared";
 import { PRICING } from "@creatorlens/shared/pricing";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default function LandingPage() {
+export default async function LandingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ code?: string; error?: string; error_description?: string }>;
+}) {
+  // Supabase sometimes redirects auth callbacks to the site_url (apex) with
+  // ?code= instead of the /auth/callback path we requested. Bounce to the
+  // proper handler so the code gets exchanged for a session.
+  const sp = (await searchParams) ?? {};
+  if (sp.code) {
+    const q = new URLSearchParams();
+    q.set("code", sp.code);
+    if (sp.error) q.set("error_description", sp.error);
+    redirect(`/auth/callback?${q.toString()}`);
+  }
+
   return (
     <main className="relative overflow-hidden">
       <div
