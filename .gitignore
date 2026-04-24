@@ -1,0 +1,44 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+.next/
+out/
+build/
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor
+.vscode/
+.idea/
+.DS_Store
+
+# vercel
+.vercel
+
+# turbo
+.turbo
+
+# supabase
+supabase/.temp/
+supabase/.env
+supabase/.branches/
+
+# runtime / coverage
+coverage/
+.nyc_output/
+
+# local data
+*.sqlite
+*.sqlite-journal

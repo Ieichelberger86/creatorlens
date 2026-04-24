@@ -1,0 +1,24 @@
+{
+  "name": "creatorlens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CreatorLens — your AI co-pilot for TikTok growth. Containerized AI agent per creator.",
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r exec rm -rf dist .next node_modules",
+    "web:dev": "pnpm --filter @creatorlens/web dev",
+    "api:dev": "pnpm --filter @creatorlens/api dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
