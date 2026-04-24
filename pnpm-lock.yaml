@@ -115,6 +115,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.32.1
+        version: 0.32.1
       '@creatorlens/db':
         specifier: workspace:*
         version: link:../../packages/db
