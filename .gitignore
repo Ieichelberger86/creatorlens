@@ -45,3 +45,6 @@ coverage/
 
 # Local dev env (contains service-role key)
 apps/web/.env.local
+
+# Local scratch scripts
+apps/web/test-*.mts
