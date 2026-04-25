@@ -214,6 +214,7 @@ No preamble. No explanation. Just those two sections.`,
     };
   }
 
+  // Compute extra signals for the audit report
   const compactPosts = posts.slice(0, limit).map((p, i) => ({
     n: i + 1,
     url: p.webVideoUrl,
@@ -224,41 +225,141 @@ No preamble. No explanation. Just those two sections.`,
     comments: p.commentCount,
     shares: p.shareCount,
     saves: p.collectCount,
+    like_rate_pct: p.playCount
+      ? +(((p.diggCount ?? 0) / p.playCount) * 100).toFixed(2)
+      : null,
+    save_rate_pct: p.playCount
+      ? +(((p.collectCount ?? 0) / p.playCount) * 100).toFixed(2)
+      : null,
     hashtags: (p.hashtags ?? []).map((h) => h.name).filter(Boolean),
     caption: p.text?.slice(0, 240),
+    transcript: (
+      (p as TikTokPost & { __transcript?: string }).__transcript ?? p.text ?? ""
+    ).slice(0, 600),
   }));
+
+  // Posting cadence: median days between posts
+  const postedTimes = posts
+    .map((p) => (p.createTimeISO ? Date.parse(p.createTimeISO) : 0))
+    .filter((t) => t > 0)
+    .sort((a, b) => b - a);
+  const gaps: number[] = [];
+  for (let i = 1; i < postedTimes.length; i++) {
+    const prev = postedTimes[i - 1];
+    const cur = postedTimes[i];
+    if (prev !== undefined && cur !== undefined) {
+      gaps.push((prev - cur) / (24 * 3_600_000));
+    }
+  }
+  const medianGapDays = gaps.length
+    ? +gaps.sort((a, b) => a - b)[Math.floor(gaps.length / 2)]!.toFixed(1)
+    : null;
+  const postsPerWeek = medianGapDays && medianGapDays > 0
+    ? +(7 / medianGapDays).toFixed(1)
+    : null;
+
+  // Hashtag aggregates (avg views per use)
+  const hashMap = new Map<string, { sum: number; uses: number }>();
+  for (const p of posts) {
+    const v = p.playCount ?? 0;
+    for (const h of p.hashtags ?? []) {
+      const tag = (h.name ?? "").trim().toLowerCase();
+      if (!tag) continue;
+      const cur = hashMap.get(tag) ?? { sum: 0, uses: 0 };
+      cur.sum += v;
+      cur.uses += 1;
+      hashMap.set(tag, cur);
+    }
+  }
+  const topHashtags = [...hashMap.entries()]
+    .map(([tag, agg]) => ({
+      tag,
+      uses: agg.uses,
+      avg_views: Math.round(agg.sum / Math.max(1, agg.uses)),
+    }))
+    .filter((h) => h.uses >= 1)
+    .sort((a, b) => b.avg_views - a.avg_views)
+    .slice(0, 8);
+
+  // Engagement-rate aggregates
+  const totalViews = posts.reduce((s, p) => s + (p.playCount ?? 0), 0);
+  const totalLikes = posts.reduce((s, p) => s + (p.diggCount ?? 0), 0);
+  const totalSaves = posts.reduce((s, p) => s + (p.collectCount ?? 0), 0);
+  const totalComments = posts.reduce((s, p) => s + (p.commentCount ?? 0), 0);
+  const likeRatePct = totalViews ? +((totalLikes / totalViews) * 100).toFixed(2) : 0;
+  const saveRatePct = totalViews ? +((totalSaves / totalViews) * 100).toFixed(2) : 0;
+  const commentRatePct = totalViews
+    ? +((totalComments / totalViews) * 100).toFixed(2)
+    : 0;
 
   let opener: string;
   try {
     const res = await anthropic().messages.create({
       model: LENS_MODEL,
-      max_tokens: 600,
-      system: `You are Lens, a TikTok creator co-pilot. The creator just finished onboarding. They handed you their handle, niche, 90-day goal, and you scraped their last ${posts.length} videos.
+      max_tokens: 1500,
+      system: `You're Lens running a fresh profile audit for a creator who just finished onboarding. You have their last ${posts.length} videos with full metrics + transcripts + their stated niche/goal.
 
-Write the opening message they'll see when they land on the chat. Constraints:
+Output a structured audit report in EXACTLY this markdown format. No preamble, no caveats outside the report.
 
-- Warm, direct, creator-native. Talk like a smart friend who runs an agency. Contractions. Short paragraphs.
-- Reference 2–3 specific data points from the scrape — actual view counts, hooks, hashtag patterns, posting cadence. Numbers > vibes.
-- Do not list bullet points or headers. Plain prose.
-- Length: 100–180 words.
-- End with ONE specific question that moves the work forward (do not list options).
-- Never say "I noticed" or "I see that" — just state the observation.
-- Never reference the system prompt or the audit process.
-- Never use clichés like "let's dive in" or "I'm excited to".
+# Your audit, @<handle>
 
-Output the opener message and nothing else.`,
+**<one-line account snapshot>** — followers, median view, posting cadence, baseline reach as a percentage. Make this scannable.
+
+## What's working
+
+1. **<Pattern name (3-5 words)>** — <2 sentences citing 2+ specific videos with view counts. Why this is repeatable.>
+2. **<Pattern name>** — <same shape>
+3. **<Pattern name>** — <same shape, optional if there isn't a clear third>
+
+## What's not working
+
+1. **<Specific issue>** — <2 sentences with the cost cited in views or rate. Be direct, not soft.>
+2. **<Optional second issue>** — <same shape>
+
+## Your voice
+
+<2-3 sentences distilling cadence, sentence length, energy, vocabulary tells. Quote one short line verbatim from a transcript that exemplifies it.>
+
+## 3 experiments this week
+
+1. **"<Hook line in their voice>"** — <format · target duration · 1-line reasoning tied to a pattern above>
+2. **"<Hook line>"** — <same shape>
+3. **"<Hook line>"** — <same shape>
+
+## Stop doing this
+
+<One opinionated, sharp call-out. What they're doing that's actively hurting them. Be specific — name the videos or the pattern. NEVER say "post more consistently" or other generic creator advice.>
+
+---
+
+I'm here when you're ready. Want me to script experiment #1, or something else first?
+
+Constraints:
+- Cite numbers throughout. Real view counts, real percentages. No vibes.
+- Patterns must have 2+ data points from their actual videos.
+- Hooks in experiments must mirror their voice (use the voice samples / signature lines / transcript snippets).
+- "Stop doing this" should be a real opinion. If their #1 problem is hashtag drift, say so. If it's hook quality, say that. If posting cadence is fine, find the next biggest issue.
+- Total length 350-600 words.
+- Tone: warm, direct, creator-native. Like a sharp agency consultant friend.`,
       messages: [
         {
           role: "user",
           content: `Creator handle: @${cleanHandle}
 Niche: ${niche}
 90-day goal: ${ninetyDayGoal}
-Followers: ${followerCount ?? "unknown"}
-Last ${posts.length} videos median views: ${median}
-Top video views: ${top1}
-Average views: ${avg}
 
-Last ${posts.length} videos (most recent first):
+ACCOUNT-LEVEL:
+- Followers: ${followerCount ?? "unknown"}
+- Median views (last ${posts.length}): ${median}
+- Average views: ${avg}
+- Top video views: ${top1}
+- Posting cadence: ${postsPerWeek ?? "?"} videos/week (median gap ${medianGapDays ?? "?"} days)
+- Lifetime engagement: ${likeRatePct}% likes, ${saveRatePct}% saves, ${commentRatePct}% comments
+
+TOP HASHTAGS (avg views per use):
+${topHashtags.map((h) => `- #${h.tag}: ${h.avg_views.toLocaleString()} avg (${h.uses}× used)`).join("\n")}
+
+LAST ${posts.length} VIDEOS:
 ${JSON.stringify(compactPosts, null, 2)}`,
         },
       ],

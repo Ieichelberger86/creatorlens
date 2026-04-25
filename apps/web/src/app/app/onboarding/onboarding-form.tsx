@@ -43,12 +43,15 @@ export function OnboardingForm() {
       ) : null}
 
       <button type="submit" disabled={pending} className="btn-primary mt-2">
-        {pending ? "Studying your last 10 videos… (~30s)" : "Meet Lens →"}
+        {pending
+          ? "Running your audit… (~45s)"
+          : "Run my audit →"}
       </button>
 
       <p className="text-center text-[11px] text-fg-subtle">
-        Lens will pull your last 10 TikToks and have a real take ready before
-        you reply. You can edit any of this later.
+        Lens pulls your last 10 TikToks, distills your voice, and writes a
+        structured audit — what&apos;s working, what isn&apos;t, three
+        experiments to run this week — by the time you land in chat.
       </p>
     </form>
   );
