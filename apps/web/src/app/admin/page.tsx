@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import type { Route } from "next";
 import { adminClient } from "@creatorlens/db";
 import { PRICING } from "@creatorlens/shared/pricing";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -88,8 +90,16 @@ export default async function AdminPage() {
             CreatorLens pre-orders
           </h1>
         </div>
-        <div className="font-mono text-xs text-fg-subtle">
-          {new Date().toISOString()}
+        <div className="flex items-center gap-4">
+          <Link
+            href={"/admin/agency" as Route}
+            className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs text-accent hover:bg-accent/20"
+          >
+            → Agency control plane
+          </Link>
+          <div className="font-mono text-xs text-fg-subtle">
+            {new Date().toISOString()}
+          </div>
         </div>
       </header>
 

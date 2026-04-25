@@ -66,6 +66,14 @@ export default async function AppLayout({
             >
               Insights
             </Link>
+            {tier === "admin" ? (
+              <Link
+                href={"/admin/agency" as Route}
+                className="hover:text-fg transition"
+              >
+                Agency
+              </Link>
+            ) : null}
           </nav>
         </div>
         <div className="flex items-center gap-3 text-xs text-fg-muted sm:gap-4">
@@ -73,6 +81,12 @@ export default async function AppLayout({
             <span className="hidden font-mono md:inline">@{handle}</span>
           ) : null}
           <span className="hidden truncate max-w-[16ch] md:inline">{display}</span>
+          <Link
+            href={"/app/settings" as Route}
+            className="hover:text-fg transition"
+          >
+            Settings
+          </Link>
           <form action="/auth/sign-out" method="POST">
             <button type="submit" className="hover:text-fg transition">
               Sign out

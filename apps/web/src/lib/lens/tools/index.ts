@@ -25,6 +25,24 @@ import {
   reviewBrandDealTool,
   reviewBrandDealExecutor,
 } from "./review-brand-deal.js";
+import { planLiveShowTool, planLiveShowExecutor } from "./plan-live-show.js";
+import {
+  recordLiveRecapTool,
+  recordLiveRecapExecutor,
+} from "./record-live-recap.js";
+import {
+  repurposeVideoTool,
+  repurposeVideoExecutor,
+} from "./repurpose-video.js";
+import {
+  cloneCompetitorHookTool,
+  cloneCompetitorHookExecutor,
+} from "./clone-competitor-hook.js";
+import { planSeriesTool, planSeriesExecutor } from "./plan-series.js";
+import {
+  draftCommentReplyTool,
+  draftCommentReplyExecutor,
+} from "./draft-comment-reply.js";
 
 export type ToolExecutor = (
   input: Record<string, unknown>,
@@ -34,12 +52,18 @@ export type ToolExecutor = (
 export const TOOLS: Anthropic.Tool[] = [
   generateHooksTool,
   draftScriptTool,
+  planSeriesTool,
   findTrendsTool,
+  cloneCompetitorHookTool,
   analyzeTiktokVideoTool,
   mineCommentsTool,
+  draftCommentReplyTool,
   postMortemTool,
+  repurposeVideoTool,
   generateThumbnailTool,
   reviewBrandDealTool,
+  planLiveShowTool,
+  recordLiveRecapTool,
   scheduleContentTool,
   listCalendarTool,
   updateCalendarEntryTool,
@@ -48,12 +72,18 @@ export const TOOLS: Anthropic.Tool[] = [
 export const EXECUTORS: Record<string, ToolExecutor> = {
   generate_hooks: generateHooksExecutor,
   draft_script: draftScriptExecutor,
+  plan_series: planSeriesExecutor,
   find_trends: findTrendsExecutor,
+  clone_competitor_hook: cloneCompetitorHookExecutor,
   analyze_tiktok_video: analyzeTiktokVideoExecutor,
   mine_comments: mineCommentsExecutor,
+  draft_comment_reply: draftCommentReplyExecutor,
   post_mortem: postMortemExecutor,
+  repurpose_video: repurposeVideoExecutor,
   generate_thumbnail: generateThumbnailExecutor,
   review_brand_deal: reviewBrandDealExecutor,
+  plan_live_show: planLiveShowExecutor,
+  record_live_recap: recordLiveRecapExecutor,
   schedule_content: scheduleContentExecutor,
   list_calendar: listCalendarExecutor,
   update_calendar_entry: updateCalendarEntryExecutor,
