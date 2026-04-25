@@ -232,16 +232,23 @@ function Group({
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="card text-center">
+      <div className="mb-2 text-3xl">📅</div>
       <div className="mb-2 font-display text-xl font-semibold">
-        Calendar is empty.
+        Your content pipeline lives here.
       </div>
       <p className="mb-6 text-sm text-fg-muted">
-        Tell Lens to schedule something — &ldquo;queue this for Tuesday at
-        6pm&rdquo; — and it&apos;ll show up here. Or add one manually.
+        Lens schedules videos when you say &ldquo;queue this for Tuesday at
+        6pm&rdquo; or pick a hook and pull it into a script. You can also add
+        rows manually below.
       </p>
-      <button onClick={onCreate} className="btn-primary text-sm">
-        + Add entry
-      </button>
+      <div className="flex flex-wrap justify-center gap-2">
+        <a href="/app" className="btn-primary text-sm">
+          Ask Lens for 5 ideas
+        </a>
+        <button onClick={onCreate} className="btn-secondary text-sm">
+          + Add manually
+        </button>
+      </div>
     </div>
   );
 }

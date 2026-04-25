@@ -149,17 +149,23 @@ export function BrandDealsClient({
 function EmptyState({ onSubmit }: { onSubmit: () => void }) {
   return (
     <div className="card text-center">
+      <div className="mb-2 text-3xl">🤝</div>
       <div className="mb-2 font-display text-xl font-semibold">
-        No deals reviewed yet.
+        Vet every brand deal that lands in your DMs.
       </div>
       <p className="mx-auto mb-6 max-w-md text-sm text-fg-muted">
-        Got a brand pitch in your DMs or inbox? Paste the whole thing here and
-        Lens will tell you if it&apos;s a scam, what they&apos;re actually
-        offering, and how to reply.
+        Lens flags scams (upfront fees, crypto payment, vague brands), extracts
+        the real terms, and drafts your reply in your voice. Paste a pitch
+        here, or just send it to Lens in chat — &ldquo;is this legit?&rdquo;
       </p>
-      <button onClick={onSubmit} className="btn-primary text-sm">
-        + Review a deal
-      </button>
+      <div className="flex flex-wrap justify-center gap-2">
+        <button onClick={onSubmit} className="btn-primary text-sm">
+          + Review a deal
+        </button>
+        <a href="/app" className="btn-secondary text-sm">
+          Paste in chat instead
+        </a>
+      </div>
     </div>
   );
 }

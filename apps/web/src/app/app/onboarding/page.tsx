@@ -20,12 +20,17 @@ export default async function OnboardingPage() {
   const admin = supabaseAdmin();
   const { data: profile } = await admin
     .from("creator_profile")
-    .select("onboarded_at")
+    .select("niche, onboarded_at")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (profile?.onboarded_at) {
     redirect("/app");
+  }
+  // Mid-flight onboarding (form submitted, audit still running) — send them
+  // to the live progress page instead of letting them re-fill the form.
+  if (profile?.niche && !profile.onboarded_at) {
+    redirect("/app/onboarding/running");
   }
 
   return (

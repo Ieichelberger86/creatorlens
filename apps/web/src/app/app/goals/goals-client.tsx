@@ -69,11 +69,26 @@ export function GoalsClient({ rows }: { rows: GoalRow[] }) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-border bg-bg-elevated/40 p-10 text-center text-fg-muted">
-          {filter === "active"
-            ? "No active goals. Ask Lens to set goals — try \"set goals from my audit\" — or finish onboarding."
-            : "Nothing in this bucket yet."}
-        </div>
+        filter === "active" ? (
+          <div className="rounded-xl border border-border bg-bg-elevated/40 p-8 text-center">
+            <div className="mb-2 text-3xl">🎯</div>
+            <h2 className="mb-2 font-display text-lg font-semibold">
+              No active goals yet.
+            </h2>
+            <p className="mx-auto mb-5 max-w-md text-sm text-fg-muted">
+              Lens sets goals automatically during onboarding from your audit
+              + 90-day vision. If yours got skipped or you want to refocus,
+              ask in chat.
+            </p>
+            <a href="/app" className="btn-primary text-sm">
+              Tell Lens &ldquo;set my goals&rdquo;
+            </a>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-bg-elevated/40 p-10 text-center text-fg-muted">
+            Nothing in this bucket yet.
+          </div>
+        )
       ) : (
         <div className="flex flex-col gap-4">
           {filtered.map((g) => (

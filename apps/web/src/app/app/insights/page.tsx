@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -222,16 +223,23 @@ export default async function InsightsPage() {
 function EmptyState() {
   return (
     <div className="card text-center">
+      <div className="mb-2 text-3xl">📊</div>
       <h2 className="mb-2 font-display text-xl font-semibold">
-        No video data yet.
+        Your stats fill in as Lens analyzes your videos.
       </h2>
-      <p className="mb-6 text-sm text-fg-muted">
-        Lens learns your numbers from the videos you analyze. Drop your TikTok
-        URLs in chat and we&apos;ll fill this page in.
+      <p className="mx-auto mb-6 max-w-md text-sm text-fg-muted">
+        Onboarding pulls your last 10 automatically. After that, drop a TikTok
+        URL in chat or run a post-mortem on a recent post and the numbers
+        compound here.
       </p>
-      <Link href="/app" className="btn-primary text-sm">
-        Open chat
-      </Link>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Link href={"/app" as Route} className="btn-primary text-sm">
+          Drop a URL in chat
+        </Link>
+        <Link href={"/app/calendar" as Route} className="btn-secondary text-sm">
+          Plan content instead
+        </Link>
+      </div>
     </div>
   );
 }
