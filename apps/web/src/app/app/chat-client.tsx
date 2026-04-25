@@ -1,16 +1,39 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+type ToolCall = {
+  id: string;
+  name: string;
+  input: unknown;
+  status: "running" | "done";
+  preview?: string;
+};
 
 type Message = {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  toolCalls?: ToolCall[];
 };
 
 export type InitialConversation = {
   conversationId: string | null;
   messages: Message[];
+};
+
+const TOOL_LABEL: Record<string, string> = {
+  generate_hooks: "Brainstorming hooks",
+  draft_script: "Writing the script",
+  find_trends: "Scanning trending posts",
+  analyze_tiktok_video: "Pulling video transcript + stats",
+  mine_comments: "Scraping comments",
+  post_mortem: "Running the post-mortem",
+  schedule_content: "Adding to your calendar",
+  list_calendar: "Reading your calendar",
+  update_calendar_entry: "Updating calendar entry",
 };
 
 export function ChatClient({ initial }: { initial: InitialConversation }) {
@@ -25,7 +48,7 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, pending]);
+  }, [messages, pending]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,12 +56,18 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
     if (!text || pending) return;
     setErr(null);
 
-    const optimistic: Message = {
+    const userMsg: Message = {
       role: "user",
       content: text,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, optimistic]);
+    const assistantMsg: Message = {
+      role: "assistant",
+      content: "",
+      created_at: new Date().toISOString(),
+      toolCalls: [],
+    };
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setDraft("");
 
     start(async () => {
@@ -46,8 +75,12 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ conversation_id: conversationId, message: text }),
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            message: text,
+          }),
         });
+
         if (res.status === 429) {
           const body = (await res.json().catch(() => ({}))) as {
             resets_at?: string;
@@ -62,25 +95,45 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
             `You've used this month's Lens budget. Resets ${resetDate}. Reach out to ian@iepropertymgmt.com if you need more headroom now.`
           );
         }
-        if (!res.ok) {
+        if (!res.ok || !res.body) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.detail || body.error || `HTTP ${res.status}`);
         }
-        const data = (await res.json()) as {
-          conversation_id: string;
-          reply: string;
-        };
-        setConversationId(data.conversation_id);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: data.reply,
-            created_at: new Date().toISOString(),
-          },
-        ]);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let nl;
+          // eslint-disable-next-line no-cond-assign
+          while ((nl = buffer.indexOf("\n")) >= 0) {
+            const line = buffer.slice(0, nl).trim();
+            buffer = buffer.slice(nl + 1);
+            if (!line) continue;
+            try {
+              const event = JSON.parse(line) as ServerEvent;
+              applyEvent(event, setMessages, setConversationId);
+            } catch {
+              // ignore parse errors on partial JSON
+            }
+          }
+        }
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
+        // Roll back the optimistic assistant placeholder if the request died
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && !last.content && !(last.toolCalls?.length)) {
+            return prev.slice(0, -1);
+          }
+          return prev;
+        });
       }
     });
   }
@@ -110,12 +163,6 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
             {messages.map((m, i) => (
               <MessageRow key={i} m={m} />
             ))}
-            {pending ? (
-              <div className="text-sm text-fg-muted">
-                <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />
-                Lens is thinking…
-              </div>
-            ) : null}
           </div>
         )}
         <div ref={endRef} />
@@ -158,19 +205,153 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
   );
 }
 
+type ServerEvent =
+  | { type: "conversation"; conversation_id: string }
+  | { type: "iteration"; index: number }
+  | { type: "text_delta"; delta: string }
+  | { type: "tool_use_start"; name: string; input: unknown; id: string }
+  | { type: "tool_use_end"; id: string; output: string }
+  | { type: "done"; result: unknown }
+  | { type: "error"; detail: string };
+
+function applyEvent(
+  event: ServerEvent,
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
+  setConversationId: React.Dispatch<React.SetStateAction<string | null>>
+) {
+  if (event.type === "conversation") {
+    setConversationId(event.conversation_id);
+    return;
+  }
+  if (event.type === "error") {
+    setMessages((prev) => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last?.role === "assistant") {
+        updated[updated.length - 1] = {
+          ...last,
+          content: `(Lens errored: ${event.detail})`,
+        };
+      }
+      return updated;
+    });
+    return;
+  }
+  if (event.type === "iteration") return;
+
+  if (event.type === "text_delta") {
+    setMessages((prev) => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last?.role === "assistant") {
+        updated[updated.length - 1] = {
+          ...last,
+          content: last.content + event.delta,
+        };
+      }
+      return updated;
+    });
+    return;
+  }
+
+  if (event.type === "tool_use_start") {
+    setMessages((prev) => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last?.role === "assistant") {
+        const toolCalls = [
+          ...(last.toolCalls ?? []),
+          {
+            id: event.id,
+            name: event.name,
+            input: event.input,
+            status: "running" as const,
+          },
+        ];
+        updated[updated.length - 1] = { ...last, toolCalls };
+      }
+      return updated;
+    });
+    return;
+  }
+
+  if (event.type === "tool_use_end") {
+    setMessages((prev) => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last?.role === "assistant" && last.toolCalls) {
+        const toolCalls = last.toolCalls.map((c) =>
+          c.id === event.id
+            ? {
+                ...c,
+                status: "done" as const,
+                preview: event.output.slice(0, 120),
+              }
+            : c
+        );
+        updated[updated.length - 1] = { ...last, toolCalls };
+      }
+      return updated;
+    });
+    return;
+  }
+}
+
 function MessageRow({ m }: { m: Message }) {
   const isUser = m.role === "user";
+  const hasContent = m.content.length > 0;
+  const showThinking =
+    !isUser && !hasContent && (!m.toolCalls || m.toolCalls.length === 0);
+
   return (
     <div className={isUser ? "flex justify-end" : "flex justify-start"}>
       <div
         className={
           isUser
             ? "max-w-[85%] rounded-2xl rounded-br-md bg-accent/20 px-4 py-3 text-sm"
-            : "max-w-[85%] rounded-2xl rounded-bl-md border border-border bg-bg-elevated px-4 py-3 text-sm"
+            : "max-w-[85%] space-y-2"
         }
       >
-        <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
+        ) : (
+          <>
+            {m.toolCalls?.map((c) => <ToolPill key={c.id} call={c} />)}
+            {showThinking ? (
+              <div className="rounded-2xl rounded-bl-md border border-border bg-bg-elevated px-4 py-3 text-sm text-fg-muted">
+                <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />
+                Lens is thinking…
+              </div>
+            ) : null}
+            {hasContent ? (
+              <div className="rounded-2xl rounded-bl-md border border-border bg-bg-elevated px-4 py-3 text-sm">
+                <div className="prose prose-sm prose-invert max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {m.content}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function ToolPill({ call }: { call: ToolCall }) {
+  const label = TOOL_LABEL[call.name] ?? call.name;
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-bg-elevated px-3 py-1 text-xs text-fg-muted">
+      {call.status === "running" ? (
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+      ) : (
+        <span className="h-1.5 w-1.5 rounded-full bg-success" />
+      )}
+      <span>{label}</span>
+      {call.status === "done" ? (
+        <span className="text-fg-subtle">· done</span>
+      ) : null}
     </div>
   );
 }

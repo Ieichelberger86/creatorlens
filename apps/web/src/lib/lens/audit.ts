@@ -125,6 +125,80 @@ export async function runProfileAudit(args: {
       { onConflict: "user_id" }
     );
 
+  // Best-effort voice extraction from the top 3 transcripts. Powers draft_script
+  // immediately so first scripts land in their cadence without manual paste.
+  const voiceCorpus = top
+    .map((p) => {
+      const t =
+        (p as TikTokPost & { __transcript?: string }).__transcript ?? p.text;
+      return typeof t === "string" && t.trim().length > 30 ? t.trim() : null;
+    })
+    .filter((t): t is string => !!t)
+    .slice(0, 3);
+
+  if (voiceCorpus.length > 0) {
+    try {
+      const voiceRes = await anthropic().messages.create({
+        model: LENS_MODEL,
+        max_tokens: 600,
+        system: `You extract a creator's voice from sample transcripts. Output exactly:
+
+VOICE TRAITS (5):
+- <trait sentence — sentence-length / vocabulary / energy / sentence structure / quirks>
+- ...
+
+SIGNATURE LINES (3):
+- "<verbatim or near-verbatim line that exemplifies their voice>"
+- "..."
+- "..."
+
+No preamble. No explanation. Just those two sections.`,
+        messages: [
+          {
+            role: "user",
+            content: `Top transcripts from the creator (most recent first):\n\n${voiceCorpus
+              .map((t, i) => `--- transcript ${i + 1} ---\n${t}`)
+              .join("\n\n")}`,
+          },
+        ],
+      });
+      const voiceText = voiceRes.content
+        .filter((b): b is import("@anthropic-ai/sdk").default.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+
+      // Parse the SIGNATURE LINES block into voice_samples; keep the full
+      // distillation in brand_notes so Lens can reference the trait list too.
+      const samples: string[] = [];
+      const sigMatch = voiceText.match(/SIGNATURE LINES[^\n]*\n([\s\S]+)/i);
+      const sigBody = sigMatch?.[1];
+      if (sigBody) {
+        const lines = sigBody.split("\n");
+        for (const l of lines) {
+          const m = l.match(/^[-•*\s]*"([^"]+)"/);
+          const inner = m?.[1];
+          if (inner) samples.push(inner.trim());
+        }
+      }
+
+      if (samples.length > 0 || voiceText.length > 0) {
+        await db
+          .from("creator_profile")
+          .upsert(
+            {
+              user_id: userId,
+              voice_samples: samples,
+              brand_notes: voiceText,
+            },
+            { onConflict: "user_id" }
+          );
+      }
+    } catch {
+      // Silent fallback — voice extraction is a quality boost, not a hard requirement
+    }
+  }
+
   // Build the opener — prefer LLM-personalized; fall back to template if scrape failed
   if (!posts.length) {
     return {

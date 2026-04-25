@@ -131,9 +131,10 @@ export async function scrapeTikTokPost(
     const commentsUrl = (post as { commentsDatasetUrl?: string }).commentsDatasetUrl;
     if (commentsUrl) {
       const m = commentsUrl.match(/datasets\/([^/?]+)/);
-      if (m) {
+      const datasetId = m?.[1];
+      if (datasetId) {
         try {
-          const cds = await client.dataset(m[1]).listItems({ limit: commentsLimit });
+          const cds = await client.dataset(datasetId).listItems({ limit: commentsLimit });
           const raws = cds.items as Array<Record<string, unknown>>;
           post.comments = raws
             .map((c) => {

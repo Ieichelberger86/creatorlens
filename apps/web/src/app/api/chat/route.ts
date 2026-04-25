@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { runLens, type LensMessage } from "@/lib/lens";
+import { streamLens, type LensMessage, type LensStreamEvent } from "@/lib/lens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,12 +30,9 @@ export async function POST(req: Request) {
   const userId = auth.user.id;
   const admin = supabaseAdmin();
 
-  // Check tier gate + token cap
   const { data: userRow } = await admin
     .from("users")
-    .select(
-      "tier, monthly_token_cap, monthly_tokens_used, monthly_period_start"
-    )
+    .select("tier, monthly_token_cap, monthly_tokens_used")
     .eq("id", userId)
     .single();
   const tier = userRow?.tier ?? "preorder";
@@ -46,7 +43,6 @@ export async function POST(req: Request) {
   const cap = userRow?.monthly_token_cap;
   const used = userRow?.monthly_tokens_used ?? 0;
   if (cap !== null && cap !== undefined && used >= cap) {
-    // Compute next reset (first of next UTC month)
     const now = new Date();
     const reset = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
@@ -69,7 +65,6 @@ export async function POST(req: Request) {
   const { message } = parsed.data;
   let { conversation_id } = parsed.data;
 
-  // Load or create the conversation row
   let history: StoredMessage[] = [];
   if (conversation_id) {
     const { data: conv } = await admin
@@ -103,7 +98,6 @@ export async function POST(req: Request) {
     conversation_id = inserted.id;
   }
 
-  // Append the user turn optimistically (saves even if the model call fails)
   const now = new Date().toISOString();
   const userStored: StoredMessage = { role: "user", content: message, created_at: now };
 
@@ -111,59 +105,88 @@ export async function POST(req: Request) {
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => ({ role: m.role, content: m.content }));
 
-  let result;
-  try {
-    result = await runLens({ userId, history: lensHistory, userMessage: message });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // Persist the user message anyway so they can see their input reflected
-    await admin
-      .from("conversations")
-      .update({
-        messages: [...history, userStored],
-        last_message_at: now,
-      })
-      .eq("id", conversation_id);
-    return NextResponse.json({ error: "lens_failed", detail: msg }, { status: 500 });
-  }
+  // Stream the response as newline-delimited JSON events. Each line is one
+  // LensStreamEvent that the client renders incrementally.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (obj: unknown) => {
+        controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+      };
 
-  const assistantStored: StoredMessage = {
-    role: "assistant",
-    content: result.reply || "(no response)",
-    created_at: new Date().toISOString(),
-    tool_calls: result.toolCalls.length ? result.toolCalls : undefined,
-  };
+      // Tell the client the conversation_id immediately so it can update its state
+      send({ type: "conversation", conversation_id });
 
-  const newMessages = [...history, userStored, assistantStored];
+      let finalEvent: Extract<LensStreamEvent, { type: "done" }> | null = null;
+      try {
+        for await (const ev of streamLens({
+          userId,
+          history: lensHistory,
+          userMessage: message,
+        })) {
+          send(ev);
+          if (ev.type === "done") finalEvent = ev;
+        }
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        send({ type: "error", detail });
+        // Persist the user turn so they can see their input even on failure
+        await admin
+          .from("conversations")
+          .update({
+            messages: [...history, userStored],
+            last_message_at: new Date().toISOString(),
+          })
+          .eq("id", conversation_id!);
+        controller.close();
+        return;
+      }
 
-  // Auto-title first conversation with a snippet of the first user message
-  const title =
-    history.length === 0
-      ? message.trim().slice(0, 60) + (message.length > 60 ? "…" : "")
-      : undefined;
+      // Persist the user + assistant turns and tick the token meter
+      const assistantStored: StoredMessage = {
+        role: "assistant",
+        content: finalEvent?.result.reply || "(no response)",
+        created_at: new Date().toISOString(),
+        tool_calls: finalEvent?.result.toolCalls.length
+          ? finalEvent.result.toolCalls
+          : undefined,
+      };
+      const newMessages = [...history, userStored, assistantStored];
+      const title =
+        history.length === 0
+          ? message.trim().slice(0, 60) + (message.length > 60 ? "…" : "")
+          : undefined;
 
-  await admin
-    .from("conversations")
-    .update({
-      messages: newMessages,
-      last_message_at: assistantStored.created_at,
-      ...(title ? { title } : {}),
-    })
-    .eq("id", conversation_id);
+      await admin
+        .from("conversations")
+        .update({
+          messages: newMessages,
+          last_message_at: assistantStored.created_at,
+          ...(title ? { title } : {}),
+        })
+        .eq("id", conversation_id!);
 
-  // Tick the user's monthly token meter (atomic, handles month rollover)
-  await admin.rpc("tick_token_meter", {
-    p_user_id: userId,
-    p_input_tokens: result.usage.inputTokens + result.usage.cacheCreationTokens,
-    p_output_tokens:
-      result.usage.outputTokens + result.usage.cacheReadTokens, // bundle cache reads here so totals add up
+      if (finalEvent) {
+        await admin.rpc("tick_token_meter", {
+          p_user_id: userId,
+          p_input_tokens:
+            finalEvent.result.usage.inputTokens +
+            finalEvent.result.usage.cacheCreationTokens,
+          p_output_tokens:
+            finalEvent.result.usage.outputTokens +
+            finalEvent.result.usage.cacheReadTokens,
+        });
+      }
+
+      controller.close();
+    },
   });
 
-  return NextResponse.json({
-    conversation_id,
-    reply: assistantStored.content,
-    tool_calls: result.toolCalls,
-    stop_reason: result.stopReason,
-    usage: result.usage,
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Accel-Buffering": "no",
+    },
   });
 }

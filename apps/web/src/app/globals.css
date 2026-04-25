@@ -23,6 +23,92 @@
   }
 }
 
+@layer base {
+  /* Markdown rendering inside chat bubbles */
+  .prose-invert {
+    --tw-prose-body: theme("colors.fg.DEFAULT");
+    --tw-prose-headings: theme("colors.fg.DEFAULT");
+    --tw-prose-links: theme("colors.accent.DEFAULT");
+    --tw-prose-bold: theme("colors.fg.DEFAULT");
+    --tw-prose-counters: theme("colors.fg.muted");
+    --tw-prose-bullets: theme("colors.fg.muted");
+    --tw-prose-hr: theme("colors.border.DEFAULT");
+    --tw-prose-quotes: theme("colors.fg.muted");
+    --tw-prose-quote-borders: theme("colors.accent.DEFAULT");
+    --tw-prose-code: theme("colors.fg.DEFAULT");
+    --tw-prose-pre-code: theme("colors.fg.DEFAULT");
+    --tw-prose-pre-bg: theme("colors.bg.subtle");
+    --tw-prose-th-borders: theme("colors.border.DEFAULT");
+    --tw-prose-td-borders: theme("colors.border.subtle");
+  }
+  .prose p,
+  .prose ul,
+  .prose ol,
+  .prose pre,
+  .prose blockquote {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+  }
+  .prose p:first-child,
+  .prose ul:first-child,
+  .prose ol:first-child {
+    margin-top: 0;
+  }
+  .prose p:last-child,
+  .prose ul:last-child,
+  .prose ol:last-child {
+    margin-bottom: 0;
+  }
+  .prose strong { color: theme("colors.fg.DEFAULT"); font-weight: 600; }
+  .prose code {
+    background: theme("colors.bg.subtle");
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+  }
+  .prose pre code {
+    background: transparent;
+    padding: 0;
+  }
+  .prose pre {
+    background: theme("colors.bg.subtle");
+    border: 1px solid theme("colors.border.DEFAULT");
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    overflow-x: auto;
+  }
+  .prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875em;
+  }
+  .prose table th,
+  .prose table td {
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid theme("colors.border.subtle");
+    text-align: left;
+  }
+  .prose table th {
+    background: theme("colors.bg.subtle");
+    font-weight: 600;
+  }
+  .prose ul, .prose ol { padding-left: 1.25rem; }
+  .prose ul li::marker { color: theme("colors.fg.muted"); }
+  .prose h1, .prose h2, .prose h3, .prose h4 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .prose h1 { font-size: 1.25rem; }
+  .prose h2 { font-size: 1.1rem; }
+  .prose h3, .prose h4 { font-size: 1rem; }
+  .prose hr {
+    border-color: theme("colors.border.DEFAULT");
+    margin: 1em 0;
+  }
+}
+
 @layer components {
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-lg bg-accent px-5 py-3
