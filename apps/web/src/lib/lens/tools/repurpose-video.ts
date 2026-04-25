@@ -25,13 +25,17 @@ export async function repurposeVideoExecutor(
   input: Record<string, unknown>,
   ctx: { userId: string }
 ): Promise<string> {
-  const { url, target } = input as {
-    url: string;
-    target?: "follow_ups" | "ig_reels" | "youtube_shorts";
-  };
-  const mode = target ?? "follow_ups";
+  // Accept both schema-canonical names and common LLM aliases — Lens
+  // sometimes calls with `video_url`/`mode` instead of `url`/`target`.
+  const aliases = input as Record<string, unknown>;
+  const url = (aliases.url ?? aliases.video_url ?? "") as string;
+  const target = (aliases.target ?? aliases.mode ?? "follow_ups") as
+    | "follow_ups"
+    | "ig_reels"
+    | "youtube_shorts";
+  const mode = target;
 
-  if (!/tiktok\.com\/.+\/video\/\d+/.test(url)) {
+  if (!url || !/tiktok\.com\/.+\/video\/\d+/.test(url)) {
     return "Pass a full TikTok video URL.";
   }
 

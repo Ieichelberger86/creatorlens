@@ -27,6 +27,82 @@ export const planLiveShowTool: Anthropic.Tool = {
   },
 };
 
+// Anthropic tool_use schema — guarantees structured output (the model fills
+// the tool input directly instead of stringifying JSON in a text block).
+const STRUCTURED_OUTPUT_TOOL: Anthropic.Tool = {
+  name: "save_live_plan",
+  description: "Save the structured live show plan back to the system.",
+  input_schema: {
+    type: "object",
+    properties: {
+      focus_topic: { type: "string" },
+      agenda_summary: { type: "string", description: "1 paragraph, 80-150 words" },
+      segments: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            duration_min: { type: "integer" },
+            intent: {
+              type: "string",
+              enum: ["warm-up", "main", "engagement-spike", "gift-trigger", "cooldown"],
+            },
+            talking_points: { type: "array", items: { type: "string" } },
+            hooks_to_reuse: { type: "array", items: { type: "string" } },
+          },
+          required: ["title", "duration_min", "intent", "talking_points", "hooks_to_reuse"],
+        },
+        minItems: 4,
+        maxItems: 8,
+      },
+      hook_bank: {
+        type: "array",
+        items: { type: "string" },
+        minItems: 10,
+        maxItems: 18,
+        description: "12-15 punchy lines (≤14 words each) the creator replays through the show.",
+      },
+      props_checklist: { type: "array", items: { type: "string" } },
+      gift_triggers: {
+        type: "array",
+        items: { type: "string" },
+        minItems: 3,
+        description: "3-5 specific moments designed to drive gift bursts.",
+      },
+      summary_markdown: {
+        type: "string",
+        description: "350-500 word markdown briefing the creator reads before going live. Sections: ## Focus / ## Show flow / ## Gift triggers / ## Hook bank / ## Setup checklist",
+      },
+    },
+    required: [
+      "focus_topic",
+      "agenda_summary",
+      "segments",
+      "hook_bank",
+      "props_checklist",
+      "gift_triggers",
+      "summary_markdown",
+    ],
+  },
+};
+
+type LivePlan = {
+  focus_topic: string;
+  agenda_summary: string;
+  segments: Array<{
+    title: string;
+    duration_min: number;
+    intent: string;
+    talking_points: string[];
+    hooks_to_reuse: string[];
+  }>;
+  hook_bank: string[];
+  props_checklist: string[];
+  gift_triggers: string[];
+  summary_markdown: string;
+};
+
 export async function planLiveShowExecutor(
   input: Record<string, unknown>,
   ctx: { userId: string }
@@ -50,33 +126,20 @@ export async function planLiveShowExecutor(
 
   const res = await anthropic().messages.create({
     model: LENS_MODEL,
-    max_tokens: 2000,
-    system: `You're Lens planning a TikTok Live show for a creator who monetizes through diamonds/gifts. Output a single valid JSON object — no preamble, no markdown fence:
-
-{
-  "focus_topic": string,
-  "agenda_summary": string,                 // 1 paragraph, 80-150 words
-  "segments": [                             // 4-8 segments, totaling ~${targetMin} min
-    {
-      "title": string,
-      "duration_min": integer,
-      "intent": "warm-up" | "main" | "engagement-spike" | "gift-trigger" | "cooldown",
-      "talking_points": [string, ...],      // 3-5 concise bullets
-      "hooks_to_reuse": [string, ...]       // 2-3 lines from the hook_bank to deploy in this segment
-    }
-  ],
-  "hook_bank": [string, ...],               // 12-15 punchy lines (≤14 words each) the creator replays through the show to grab new joiners. Match their voice.
-  "props_checklist": [string, ...],         // physical setup: lighting, mic, props, on-screen elements
-  "gift_triggers": [string, ...],           // 3-5 specific moments designed to drive gift bursts (reactions, reveals, gamified bits, shoutouts)
-  "summary_markdown": string                // 350-500 word markdown briefing the creator reads before going live
-}
+    max_tokens: 2500,
+    tools: [STRUCTURED_OUTPUT_TOOL],
+    tool_choice: { type: "tool", name: "save_live_plan" },
+    system: `You're Lens planning a TikTok Live show for a creator who monetizes through diamonds/gifts.
 
 Constraints:
 - Live shows monetize when viewers stick around. Build cliffhangers between segments.
 - Hook bank must be replayable — a viewer who joins in minute 47 still needs a reason to stay.
 - Gift triggers must be specific moments, not generic "engage more". Examples: "react to the next gift live", "rank top 3 audience-submitted [thing]", "do the thing if we hit 100 saves".
 - Match the creator's voice using the samples below.
-- summary_markdown sections: ## Focus / ## Show flow / ## Gift triggers / ## Hook bank / ## Setup checklist`,
+- Segments should total approximately ${targetMin} minutes.
+- summary_markdown sections: ## Focus / ## Show flow / ## Gift triggers / ## Hook bank / ## Setup checklist
+
+Call save_live_plan with the structured plan.`,
     messages: [
       {
         role: "user",
@@ -91,35 +154,16 @@ ${profile?.top_videos ? `\nRecent winners:\n${JSON.stringify(profile.top_videos)
     ],
   });
 
-  const raw = res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("")
-    .trim();
-  const jsonText = (raw.match(/\{[\s\S]+\}/)?.[0] ?? raw).trim();
+  // Extract the tool_use block — guaranteed-structured output
+  const toolUse = res.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "save_live_plan"
+  );
 
-  type Plan = {
-    focus_topic: string;
-    agenda_summary: string;
-    segments: Array<{
-      title: string;
-      duration_min: number;
-      intent: string;
-      talking_points: string[];
-      hooks_to_reuse: string[];
-    }>;
-    hook_bank: string[];
-    props_checklist: string[];
-    gift_triggers: string[];
-    summary_markdown: string;
-  };
-
-  let plan: Plan;
-  try {
-    plan = JSON.parse(jsonText) as Plan;
-  } catch {
-    return `Live plan came back unstructured. Raw:\n\n${raw.slice(0, 500)}`;
+  if (!toolUse) {
+    return "Couldn't generate a structured live plan. Try again or paste your show goals.";
   }
+
+  const plan = toolUse.input as LivePlan;
 
   // Persist
   const scheduledIso = scheduled_for

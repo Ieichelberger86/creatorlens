@@ -186,7 +186,14 @@ ${offer_text.trim()}
     .trim();
 
   // Extract the JSON — Claude might still wrap in fences despite the instructions
-  const jsonText = (raw.match(/\{[\s\S]+\}/)?.[0] ?? raw).trim();
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]+?)\s*```/);
+  const candidate = (fenced?.[1] ?? raw).trim();
+  const firstBrace = candidate.indexOf("{");
+  const lastBrace = candidate.lastIndexOf("}");
+  const jsonText =
+    firstBrace !== -1 && lastBrace > firstBrace
+      ? candidate.slice(firstBrace, lastBrace + 1)
+      : candidate;
 
   let analysis: Analysis;
   try {

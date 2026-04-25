@@ -90,7 +90,15 @@ export async function recordLiveRecapExecutor(
   const res = await anthropic().messages.create({
     model: LENS_MODEL,
     max_tokens: 1200,
-    system: `You're Lens running a post-live recap for a creator who monetizes through TikTok Live diamonds. Output ONE valid JSON:
+    system: `You're Lens running a post-live recap for a creator who monetizes through TikTok Live diamonds.
+
+CRITICAL OUTPUT RULES (failure to follow these breaks the system):
+- Begin your response with "{" and end with "}". Nothing before, nothing after.
+- Do NOT wrap in \`\`\`json or any code fence.
+- Do NOT include any preamble or commentary outside the JSON.
+- The first character of your response must be "{".
+
+Output schema:
 
 {
   "verdict": "breakout" | "above_baseline" | "on_baseline" | "below_baseline" | "too_thin_to_call",
@@ -143,13 +151,24 @@ BASELINE (rolling 30 days, ${baselineLives.length} prior lives):
     .map((b) => b.text)
     .join("")
     .trim();
-  const jsonText = (raw.match(/\{[\s\S]+\}/)?.[0] ?? raw).trim();
+
+  // Strip ```json / ``` fences, find outermost JSON object
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]+?)\s*```/);
+  const candidate = (fenced?.[1] ?? raw).trim();
+  const firstBrace = candidate.indexOf("{");
+  const lastBrace = candidate.lastIndexOf("}");
+  const jsonText =
+    firstBrace !== -1 && lastBrace > firstBrace
+      ? candidate.slice(firstBrace, lastBrace + 1)
+      : candidate;
 
   let analysis: { verdict: string; ai_recap: string; ai_next_show: string };
   try {
     analysis = JSON.parse(jsonText);
   } catch {
-    return `Recap analysis came back unstructured.\n\n${raw.slice(0, 500)}`;
+    // Last-resort: surface what we got, stripped of fences
+    const cleaned = raw.replace(/```(?:json)?/g, "").replace(/```/g, "").trim();
+    return `**Live recap (couldn't structure all fields):**\n\n${cleaned}`;
   }
 
   // Save / update
