@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, LENS_MODEL } from "../client.js";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { tryParseJson } from "../parse.js";
 
 export const reviewBrandDealTool: Anthropic.Tool = {
   name: "review_brand_deal",
@@ -185,20 +186,8 @@ ${offer_text.trim()}
     .join("")
     .trim();
 
-  // Extract the JSON — Claude might still wrap in fences despite the instructions
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]+?)\s*```/);
-  const candidate = (fenced?.[1] ?? raw).trim();
-  const firstBrace = candidate.indexOf("{");
-  const lastBrace = candidate.lastIndexOf("}");
-  const jsonText =
-    firstBrace !== -1 && lastBrace > firstBrace
-      ? candidate.slice(firstBrace, lastBrace + 1)
-      : candidate;
-
-  let analysis: Analysis;
-  try {
-    analysis = JSON.parse(jsonText) as Analysis;
-  } catch {
+  const analysis = tryParseJson<Analysis>(raw);
+  if (!analysis) {
     return `Couldn't parse the deal review (model returned unstructured output). Raw response:\n\n${raw.slice(0, 600)}`;
   }
 

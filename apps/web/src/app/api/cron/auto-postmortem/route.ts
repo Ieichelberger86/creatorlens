@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { isAuthorizedCron } from "@/lib/cron";
+import { isAuthorizedCron, alertCronFailure } from "@/lib/cron";
 import { postMortemExecutor } from "@/lib/lens/tools/post-mortem";
 
 export const runtime = "nodejs";
@@ -11,7 +11,21 @@ export async function GET(req: Request) {
   if (!isAuthorizedCron(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  try {
+    return await runAutoPostmortem();
+  } catch (err) {
+    await alertCronFailure({ job: "auto-postmortem", error: err });
+    return NextResponse.json(
+      {
+        error: "auto_postmortem_failed",
+        message: err instanceof Error ? err.message : String(err),
+      },
+      { status: 500 }
+    );
+  }
+}
 
+async function runAutoPostmortem(): Promise<Response> {
   const admin = supabaseAdmin();
 
   // Find calendar entries that:

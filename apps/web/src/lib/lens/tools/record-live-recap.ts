@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, LENS_MODEL } from "../client.js";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { tryParseJson, stripFences } from "../parse.js";
 
 export const recordLiveRecapTool: Anthropic.Tool = {
   name: "record_live_recap",
@@ -152,23 +153,13 @@ BASELINE (rolling 30 days, ${baselineLives.length} prior lives):
     .join("")
     .trim();
 
-  // Strip ```json / ``` fences, find outermost JSON object
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]+?)\s*```/);
-  const candidate = (fenced?.[1] ?? raw).trim();
-  const firstBrace = candidate.indexOf("{");
-  const lastBrace = candidate.lastIndexOf("}");
-  const jsonText =
-    firstBrace !== -1 && lastBrace > firstBrace
-      ? candidate.slice(firstBrace, lastBrace + 1)
-      : candidate;
-
-  let analysis: { verdict: string; ai_recap: string; ai_next_show: string };
-  try {
-    analysis = JSON.parse(jsonText);
-  } catch {
-    // Last-resort: surface what we got, stripped of fences
-    const cleaned = raw.replace(/```(?:json)?/g, "").replace(/```/g, "").trim();
-    return `**Live recap (couldn't structure all fields):**\n\n${cleaned}`;
+  const analysis = tryParseJson<{
+    verdict: string;
+    ai_recap: string;
+    ai_next_show: string;
+  }>(raw);
+  if (!analysis) {
+    return `**Live recap (couldn't structure all fields):**\n\n${stripFences(raw)}`;
   }
 
   // Save / update

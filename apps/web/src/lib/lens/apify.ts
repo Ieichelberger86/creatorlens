@@ -57,9 +57,43 @@ export type TikTokPost = {
 };
 
 /**
+ * Apify retry: 3 attempts with exponential backoff (0s, 1s, 4s).
+ * Retries on 5xx, timeouts, and network errors. Does NOT retry 4xx
+ * (those are deterministic — bad URL, bad input, etc.) so we don't
+ * burn budget on inputs that will keep failing.
+ */
+async function withRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  attempts = 3
+): Promise<T> {
+  let lastErr: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      // Bail on 4xx — retrying won't help (bad URL / bad input)
+      if (/Apify 4\d\d/.test(msg)) throw err;
+      // Last attempt — re-throw
+      if (i === attempts - 1) throw err;
+      // Exponential backoff
+      const delay = Math.pow(4, i) * 1000;
+      console.log(`[apify ${label}] attempt ${i + 1}/${attempts} failed: ${msg.slice(0, 120)} — retrying in ${delay}ms`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/**
  * Run actor synchronously and return the default dataset items in one call.
  * Apify's run-sync-get-dataset-items returns the JSON dataset directly when
  * the run completes within the timeout.
+ *
+ * Wrapped in withRetry — Apify's proxy network is reliable but not perfect,
+ * and a single transient failure shouldn't kill onboarding or a tool call.
  */
 async function runActorSync<T = unknown>(
   actorId: string,
@@ -67,31 +101,66 @@ async function runActorSync<T = unknown>(
   timeoutSec = 180,
   itemLimit?: number
 ): Promise<{ items: T[]; defaultDatasetId: string | null }> {
-  const params = new URLSearchParams({ token: token() });
-  if (timeoutSec) params.set("timeout", String(timeoutSec));
-  if (itemLimit) params.set("limit", String(itemLimit));
+  return withRetry(`runActor ${actorId}`, async () => {
+    const params = new URLSearchParams({ token: token() });
+    if (timeoutSec) params.set("timeout", String(timeoutSec));
+    if (itemLimit) params.set("limit", String(itemLimit));
 
-  const url = `${APIFY_BASE}/acts/${actorId}/run-sync-get-dataset-items?${params}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-    signal: AbortSignal.timeout((timeoutSec + 30) * 1000),
+    const url = `${APIFY_BASE}/acts/${actorId}/run-sync-get-dataset-items?${params}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout((timeoutSec + 30) * 1000),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Apify ${res.status}: ${body.slice(0, 300)}`);
+    }
+
+    const items = (await res.json()) as T[];
+    return {
+      items: Array.isArray(items) ? items : [],
+      defaultDatasetId: null,
+    };
   });
+}
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Apify ${res.status}: ${body.slice(0, 300)}`);
+/**
+ * Lightweight handle existence check. HEADs the public TikTok profile page —
+ * 200 = handle exists, 404 = doesn't. Lets onboarding fail fast on typos
+ * before spending 30-60s in Apify.
+ */
+export async function checkTikTokHandleExists(handle: string): Promise<{
+  exists: boolean;
+  reason?: string;
+}> {
+  const cleanHandle = handle.trim().replace(/^@+/, "").toLowerCase();
+  if (!/^[a-z0-9._]{1,40}$/.test(cleanHandle)) {
+    return { exists: false, reason: "invalid_format" };
   }
-
-  // The dataset id comes in the X-Apify-Pagination-... headers as well as
-  // an `Apify-Dataset` (lowercased) header on some responses. We only need
-  // it for comments scraping where commentsDatasetUrl gives it directly.
-  const items = (await res.json()) as T[];
-  return {
-    items: Array.isArray(items) ? items : [],
-    defaultDatasetId: null,
-  };
+  try {
+    const res = await fetch(`https://www.tiktok.com/@${cleanHandle}`, {
+      method: "HEAD",
+      signal: AbortSignal.timeout(8_000),
+      redirect: "manual",
+      headers: {
+        // TikTok blocks default UA — pretend to be a normal browser
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      },
+    });
+    if (res.status === 200) return { exists: true };
+    if (res.status === 404) return { exists: false, reason: "not_found" };
+    if (res.status >= 300 && res.status < 400) return { exists: true };
+    // Anything else (403, 429, 5xx) — treat as "unable to confirm" but
+    // don't block onboarding. Apify will sort it out.
+    return { exists: true, reason: `tiktok_${res.status}_treated_as_exists` };
+  } catch {
+    // Network blip — don't block onboarding
+    return { exists: true, reason: "check_failed_treated_as_exists" };
+  }
 }
 
 async function fetchDatasetItems<T = unknown>(

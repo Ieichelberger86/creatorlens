@@ -268,6 +268,9 @@ Now decompose their 90-day goal into structured goals + action plans. Use baseli
 
   const { data: saved, error } = await db.from("goals").insert(rows).select("id, title");
   if (error) {
+    // Atomic rollback: if any goals partially landed, delete them so we
+    // don't leave orphans
+    await db.from("goals").delete().eq("user_id", userId).eq("source", "onboarding_audit");
     return {
       ok: false,
       goals_saved: 0,

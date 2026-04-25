@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { isAuthorizedCron } from "@/lib/cron";
+import { isAuthorizedCron, alertCronFailure } from "@/lib/cron";
 import { scrapeTikTokProfile } from "@/lib/lens/apify";
 
 export const runtime = "nodejs";
@@ -13,7 +13,21 @@ export async function GET(req: Request) {
   if (!isAuthorizedCron(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  try {
+    return await runWatch();
+  } catch (err) {
+    await alertCronFailure({ job: "competitor-watch", error: err });
+    return NextResponse.json(
+      {
+        error: "competitor_watch_failed",
+        message: err instanceof Error ? err.message : String(err),
+      },
+      { status: 500 }
+    );
+  }
+}
 
+async function runWatch(): Promise<Response> {
   const admin = supabaseAdmin();
 
   // All competitor rows that haven't been scanned in the last 18 hours

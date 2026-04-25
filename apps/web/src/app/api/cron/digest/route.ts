@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resend, FROM, REPLY_TO, emailShell } from "@/lib/email";
-import { isAuthorizedCron } from "@/lib/cron";
+import { isAuthorizedCron, alertCronFailure } from "@/lib/cron";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,21 @@ export async function GET(req: Request) {
   if (!isAuthorizedCron(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  try {
+    return await runDigest();
+  } catch (err) {
+    await alertCronFailure({ job: "digest", error: err });
+    return NextResponse.json(
+      {
+        error: "digest_failed",
+        message: err instanceof Error ? err.message : String(err),
+      },
+      { status: 500 }
+    );
+  }
+}
 
+async function runDigest(): Promise<Response> {
   const admin = supabaseAdmin();
 
   // All Vanguard + admin users (no preorders, no churned)

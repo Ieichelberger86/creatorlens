@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { checkTikTokHandleExists } from "@/lib/lens/apify";
 
 const STREAMS = [
   "live_gifts",
@@ -82,6 +83,24 @@ export async function saveOnboarding(
   }
 
   const { tiktok_handle, niche, ninety_day_goal, monetization_streams } = parsed.data;
+
+  // Pre-validate the handle before burning 30-60s on Apify + Anthropic
+  const handleCheck = await checkTikTokHandleExists(tiktok_handle);
+  if (!handleCheck.exists && handleCheck.reason === "not_found") {
+    return {
+      ok: false,
+      error: `TikTok says @${tiktok_handle} doesn't exist. Double-check the spelling — your handle is the part after the @.`,
+      fieldErrors: { tiktok_handle: "Handle not found on TikTok." },
+    };
+  }
+  if (!handleCheck.exists && handleCheck.reason === "invalid_format") {
+    return {
+      ok: false,
+      error: "Handle should be the part after @ — letters, numbers, dots, underscores only.",
+      fieldErrors: { tiktok_handle: "Invalid format." },
+    };
+  }
+
   const admin = supabaseAdmin();
 
   // Save profile inputs WITHOUT onboarded_at — that fires after audit completes
