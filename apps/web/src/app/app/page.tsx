@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/supabase/server";
 import { ChatClient, type InitialConversation } from "./chat-client";
@@ -16,6 +17,18 @@ export default async function LensAppPage() {
   if (!user) return null;
 
   const admin = supabaseAdmin();
+
+  // Onboarding gate — first-time creators answer 3 questions before chat.
+  const { data: profile } = await admin
+    .from("creator_profile")
+    .select("onboarded_at")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!profile?.onboarded_at) {
+    redirect("/app/onboarding");
+  }
+
   const { data: conv } = await admin
     .from("conversations")
     .select("id, messages, last_message_at")
