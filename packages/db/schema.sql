@@ -23,6 +23,12 @@ do $$ begin
   create type conversation_channel as enum ('web', 'telegram', 'discord');
 exception when duplicate_object then null; end $$;
 
+do $$ begin
+  create type calendar_status as enum (
+    'idea', 'drafting', 'shooting', 'edited', 'scheduled', 'posted', 'cancelled'
+  );
+exception when duplicate_object then null; end $$;
+
 -- =========================================================================
 -- USERS  (mirrors auth.users; Supabase Auth writes the auth row, we add metadata)
 -- =========================================================================
@@ -187,6 +193,37 @@ alter table public.preorders enable row level security;
 
 -- preorders are written by service role only (from Stripe webhook); reads are service role only.
 -- No public policies.
+
+-- =========================================================================
+-- CONTENT CALENDAR  (per-creator content pipeline)
+-- =========================================================================
+create table if not exists public.content_calendar (
+  id            uuid primary key default uuid_generate_v4(),
+  user_id       uuid not null references public.users(id) on delete cascade,
+  status        calendar_status not null default 'idea',
+  title         text not null,
+  hook          text,
+  script        text,
+  notes         text,
+  scheduled_for timestamptz,
+  posted_at     timestamptz,
+  posted_url    text,
+  source_conversation_id uuid references public.conversations(id) on delete set null,
+  metadata      jsonb not null default '{}'::jsonb,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists idx_calendar_user_date    on public.content_calendar(user_id, scheduled_for);
+create index if not exists idx_calendar_user_status  on public.content_calendar(user_id, status);
+create index if not exists idx_calendar_user_created on public.content_calendar(user_id, created_at desc);
+
+alter table public.content_calendar enable row level security;
+
+drop policy if exists "calendar: read self"  on public.content_calendar;
+drop policy if exists "calendar: write self" on public.content_calendar;
+create policy "calendar: read self"  on public.content_calendar for select using (auth.uid() = user_id);
+create policy "calendar: write self" on public.content_calendar for all    using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- =========================================================================
 -- REFERRALS  (Phase 7, scaffolded now for forward compat)

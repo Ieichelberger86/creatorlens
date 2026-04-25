@@ -32,15 +32,28 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-[100dvh] flex-col">
       <header className="relative z-10 flex items-center justify-between border-b border-border bg-bg-elevated/60 px-6 py-3 backdrop-blur">
-        <Link href={"/app" as Route} className="flex items-center gap-2">
-          <div className="h-5 w-5 rounded-md bg-accent" />
-          <span className="font-display text-sm font-semibold tracking-tight">
-            CreatorLens
-          </span>
-          <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">
-            {tier === "admin" ? "admin" : "vanguard alpha"}
-          </span>
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href={"/app" as Route} className="flex items-center gap-2">
+            <div className="h-5 w-5 rounded-md bg-accent" />
+            <span className="font-display text-sm font-semibold tracking-tight">
+              CreatorLens
+            </span>
+            <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">
+              {tier === "admin" ? "admin" : "vanguard alpha"}
+            </span>
+          </Link>
+          <nav className="flex items-center gap-4 text-sm text-fg-muted">
+            <Link href={"/app" as Route} className="hover:text-fg transition">
+              Chat
+            </Link>
+            <Link
+              href={"/app/calendar" as Route}
+              className="hover:text-fg transition"
+            >
+              Calendar
+            </Link>
+          </nav>
+        </div>
         <div className="flex items-center gap-4 text-xs text-fg-muted">
           {handle ? <span className="font-mono">@{handle}</span> : null}
           <span>{display}</span>
