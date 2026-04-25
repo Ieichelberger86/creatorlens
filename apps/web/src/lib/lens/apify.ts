@@ -149,3 +149,39 @@ export async function scrapeTikTokProfile(
   const dataset = await client.dataset(run.defaultDatasetId).listItems({ limit: n });
   return (dataset.items as TikTokPost[]) ?? [];
 }
+
+/**
+ * Scrape recent posts under given hashtags. Used by find_trends.
+ */
+export async function scrapeTikTokHashtags(
+  hashtags: string[],
+  limitPerTag = 20
+): Promise<TikTokPost[]> {
+  const client = apify();
+  if (!client) throw new Error("APIFY_TOKEN not configured");
+
+  const cleaned = hashtags
+    .map((h) => h.trim().replace(/^#+/, "").toLowerCase())
+    .filter(Boolean)
+    .slice(0, 5); // cap to avoid runaway scrapes
+  if (!cleaned.length) return [];
+
+  const n = Math.min(Math.max(limitPerTag, 5), 50);
+
+  const run = await client.actor(TIKTOK_SCRAPER).call(
+    {
+      hashtags: cleaned,
+      resultsPerPage: n,
+      shouldDownloadVideos: false,
+      shouldDownloadCovers: false,
+      shouldDownloadSubtitles: false, // no transcripts needed for trend scan
+      proxyConfiguration: { useApifyProxy: true },
+    },
+    { timeout: 240, waitSecs: 240 }
+  );
+
+  const dataset = await client.dataset(run.defaultDatasetId).listItems({
+    limit: n * cleaned.length,
+  });
+  return (dataset.items as TikTokPost[]) ?? [];
+}
