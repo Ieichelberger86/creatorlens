@@ -55,6 +55,12 @@ export default async function AppLayout({
               Calendar
             </Link>
             <Link
+              href={"/app/brand-deals" as Route}
+              className="hover:text-fg transition"
+            >
+              Brand deals
+            </Link>
+            <Link
               href={"/app/insights" as Route}
               className="hover:text-fg transition"
             >

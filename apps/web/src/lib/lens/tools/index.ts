@@ -21,6 +21,10 @@ import {
   generateThumbnailTool,
   generateThumbnailExecutor,
 } from "./generate-thumbnail.js";
+import {
+  reviewBrandDealTool,
+  reviewBrandDealExecutor,
+} from "./review-brand-deal.js";
 
 export type ToolExecutor = (
   input: Record<string, unknown>,
@@ -35,6 +39,7 @@ export const TOOLS: Anthropic.Tool[] = [
   mineCommentsTool,
   postMortemTool,
   generateThumbnailTool,
+  reviewBrandDealTool,
   scheduleContentTool,
   listCalendarTool,
   updateCalendarEntryTool,
@@ -48,6 +53,7 @@ export const EXECUTORS: Record<string, ToolExecutor> = {
   mine_comments: mineCommentsExecutor,
   post_mortem: postMortemExecutor,
   generate_thumbnail: generateThumbnailExecutor,
+  review_brand_deal: reviewBrandDealExecutor,
   schedule_content: scheduleContentExecutor,
   list_calendar: listCalendarExecutor,
   update_calendar_entry: updateCalendarEntryExecutor,

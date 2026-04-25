@@ -23,9 +23,11 @@ export async function runProfileAudit(args: {
   handle: string;
   niche: string;
   ninetyDayGoal: string;
+  monetizationStreams?: string[];
   limit?: number;
 }): Promise<AuditResult> {
   const { userId, handle, niche, ninetyDayGoal } = args;
+  const monetizationStreams = args.monetizationStreams ?? [];
   const limit = args.limit ?? 10;
   const cleanHandle = handle.replace(/^@+/, "").toLowerCase();
 
@@ -347,6 +349,21 @@ Constraints:
           content: `Creator handle: @${cleanHandle}
 Niche: ${niche}
 90-day goal: ${ninetyDayGoal}
+Monetization streams (where they actually make money): ${
+            monetizationStreams.length
+              ? monetizationStreams.join(", ")
+              : "(not specified)"
+          }
+
+The audit MUST be filtered through their monetization stream:
+- live_gifts: optimize for hooks that drive viewers into their live + trigger gift moments
+- creator_rewards: optimize for watch-time + completion rate on long-form
+- brand_deals: optimize for follower count + niche authority + clean public-facing aesthetic
+- tiktok_shop_affiliate / tiktok_shop_seller: optimize for product demo + buy-now CTAs + saves
+- subscriptions: optimize for parasocial / community-building hooks
+- lead_gen: optimize for DMs + saves (saved videos = bookmarked intent)
+- info_product: optimize for off-platform clicks + email capture hooks
+- ugc_contracts: optimize for production quality showcase, not personal reach
 
 ACCOUNT-LEVEL:
 - Followers: ${followerCount ?? "unknown"}

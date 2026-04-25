@@ -6,6 +6,18 @@ import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runProfileAudit } from "@/lib/lens/audit";
 
+const STREAMS = [
+  "live_gifts",
+  "creator_rewards",
+  "brand_deals",
+  "tiktok_shop_affiliate",
+  "tiktok_shop_seller",
+  "subscriptions",
+  "lead_gen",
+  "info_product",
+  "ugc_contracts",
+] as const;
+
 const Schema = z.object({
   tiktok_handle: z
     .string()
@@ -28,6 +40,10 @@ const Schema = z.object({
     .string()
     .min(8, "What does winning in 90 days look like?")
     .max(500),
+  monetization_streams: z
+    .array(z.enum(STREAMS))
+    .min(1, "Pick at least one revenue stream you're going after.")
+    .max(9),
 });
 
 export type OnboardingState = {
@@ -47,6 +63,7 @@ export async function saveOnboarding(
     tiktok_handle: String(form.get("tiktok_handle") ?? ""),
     niche: String(form.get("niche") ?? "").trim(),
     ninety_day_goal: String(form.get("ninety_day_goal") ?? "").trim(),
+    monetization_streams: form.getAll("monetization_streams").map(String),
   };
 
   const parsed = Schema.safeParse(raw);
@@ -59,7 +76,7 @@ export async function saveOnboarding(
     return { ok: false, error: "Fix the highlighted fields.", fieldErrors };
   }
 
-  const { tiktok_handle, niche, ninety_day_goal } = parsed.data;
+  const { tiktok_handle, niche, ninety_day_goal, monetization_streams } = parsed.data;
   const admin = supabaseAdmin();
 
   // 1. Upsert creator_profile
@@ -70,6 +87,7 @@ export async function saveOnboarding(
         user_id: user.id,
         niche,
         goals: { ninety_day: ninety_day_goal },
+        monetization_streams,
         onboarded_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }
@@ -92,6 +110,7 @@ export async function saveOnboarding(
     handle: tiktok_handle,
     niche,
     ninetyDayGoal: ninety_day_goal,
+    monetizationStreams: monetization_streams,
     limit: 10,
   });
 

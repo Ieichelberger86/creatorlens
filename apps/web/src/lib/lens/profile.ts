@@ -8,7 +8,7 @@ export async function loadProfileSummary(userId: string): Promise<string> {
       db.from("users").select("display_name, tiktok_handle, email").eq("id", userId).maybeSingle(),
       db
         .from("creator_profile")
-        .select("niche, voice_samples, top_videos, competitors, brand_notes, goals, onboarded_at")
+        .select("niche, voice_samples, top_videos, competitors, brand_notes, goals, monetization_streams, onboarded_at")
         .eq("user_id", userId)
         .maybeSingle(),
       db
@@ -31,6 +31,11 @@ export async function loadProfileSummary(userId: string): Promise<string> {
   const goals = (profile?.goals as Record<string, unknown>) ?? {};
   if (Object.keys(goals).length) {
     parts.push(`Goals: ${JSON.stringify(goals)}`);
+  }
+
+  const streams = (profile?.monetization_streams as string[] | null) ?? [];
+  if (streams.length) {
+    parts.push(`Monetization streams (filter every recommendation through these): ${streams.join(", ")}`);
   }
 
   if (profile?.brand_notes) parts.push(`Brand notes: ${profile.brand_notes}`);

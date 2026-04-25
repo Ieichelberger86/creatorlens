@@ -33,6 +33,8 @@ const TOOL_LABEL: Record<string, string> = {
   analyze_tiktok_video: "Pulling video transcript + stats",
   mine_comments: "Scraping comments",
   post_mortem: "Running the post-mortem",
+  generate_thumbnail: "Rendering a thumbnail concept",
+  review_brand_deal: "Reviewing the brand deal",
   schedule_content: "Adding to your calendar",
   list_calendar: "Reading your calendar",
   update_calendar_entry: "Updating calendar entry",
