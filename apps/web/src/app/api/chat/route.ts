@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { streamLens, type LensMessage, type LensStreamEvent } from "@/lib/lens";
+import { anthropic, LENS_MODEL } from "@/lib/lens/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -152,7 +153,9 @@ export async function POST(req: Request) {
           : undefined,
       };
       const newMessages = [...history, userStored, assistantStored];
-      const title =
+      // Provisional title: truncated user message. Replaced by the smart
+      // title call below (best-effort, runs in background).
+      const provisionalTitle =
         history.length === 0
           ? message.trim().slice(0, 60) + (message.length > 60 ? "…" : "")
           : undefined;
@@ -162,9 +165,26 @@ export async function POST(req: Request) {
         .update({
           messages: newMessages,
           last_message_at: assistantStored.created_at,
-          ...(title ? { title } : {}),
+          ...(provisionalTitle ? { title: provisionalTitle } : {}),
         })
         .eq("id", conversation_id!);
+
+      // Smart title: after the first turn, ask Claude to write a 4-6 word
+      // descriptive title. Runs after persistence — best-effort, swallows
+      // failures. Skips if the user sent the audit-onboarding starter
+      // message ("Profile audit + goals" is already a fine title set by
+      // the onboarding runner).
+      if (history.length === 0 && conversation_id) {
+        // Fire-and-forget; don't block the response stream
+        void smartTitle(
+          message,
+          assistantStored.content,
+          conversation_id,
+          admin
+        ).catch(() => {
+          // silent — provisional title remains
+        });
+      }
 
       if (finalEvent) {
         await admin.rpc("tick_token_meter", {
@@ -189,4 +209,47 @@ export async function POST(req: Request) {
       "X-Accel-Buffering": "no",
     },
   });
+}
+
+/**
+ * Background task: ask Claude for a short descriptive title for this
+ * conversation given the user's first message + assistant's first reply.
+ * Runs after the response stream has closed — never blocks the user.
+ *
+ * If it fails, the provisional title (truncated user message) stays.
+ */
+async function smartTitle(
+  userMessage: string,
+  assistantReply: string,
+  conversationId: string,
+  admin: ReturnType<typeof supabaseAdmin>
+): Promise<void> {
+  try {
+    const res = await anthropic().messages.create({
+      model: LENS_MODEL,
+      max_tokens: 30,
+      system:
+        "Write a 3-6 word descriptive title for this conversation. No quotes, no period, sentence case. Examples: 'First-deal hook ideas', 'Brand pitch from Gymshark', 'Series plan for buyer agents'. Output ONLY the title.",
+      messages: [
+        {
+          role: "user",
+          content: `User opened with:\n${userMessage.slice(0, 500)}\n\nLens replied:\n${assistantReply.slice(0, 600)}`,
+        },
+      ],
+    });
+    const text = res.content
+      .filter((b) => b.type === "text")
+      .map((b) => (b as { text: string }).text)
+      .join("")
+      .trim()
+      .replace(/^["']|["']$/g, "")
+      .slice(0, 80);
+    if (text.length < 3) return;
+    await admin
+      .from("conversations")
+      .update({ title: text })
+      .eq("id", conversationId);
+  } catch {
+    // best-effort — provisional title remains
+  }
 }

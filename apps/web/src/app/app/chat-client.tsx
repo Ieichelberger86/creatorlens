@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { saveDraftToCalendar } from "./conversations/actions";
+import { saveDraftToCalendar, createNewConversation } from "./conversations/actions";
 
 type ToolCall = {
   id: string;
@@ -48,6 +49,7 @@ const TOOL_LABEL: Record<string, string> = {
 };
 
 export function ChatClient({ initial }: { initial: InitialConversation }) {
+  const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(
     initial.conversationId
   );
@@ -56,10 +58,35 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const endRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pending]);
+
+  // Keyboard shortcuts: Cmd/Ctrl+K = new chat, Cmd/Ctrl+/ = focus composer,
+  // Esc = clear composer
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const cmd = e.metaKey || e.ctrlKey;
+      if (cmd && e.key === "k") {
+        e.preventDefault();
+        if (pending) return;
+        // Server action redirects to /app/c/<new id>
+        void createNewConversation();
+      } else if (cmd && e.key === "/") {
+        e.preventDefault();
+        composerRef.current?.focus();
+      } else if (e.key === "Escape" && document.activeElement === composerRef.current) {
+        if (draft.length > 0) {
+          e.preventDefault();
+          setDraft("");
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pending, draft, router]);
 
   function send(text: string) {
     if (!text || pending) return;
@@ -134,11 +161,30 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
           }
         }
       } catch (e) {
-        setErr(e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        // Stream interrupt detection — clearer message + restore draft so
+        // the user can retry without retyping
+        const isInterrupt =
+          /network|fetch|aborted|stream|reader|disconnected/i.test(msg) &&
+          !/budget|resets/i.test(msg);
+        if (isInterrupt) {
+          setErr(
+            "Connection dropped before Lens finished. Your message is restored — hit Send to try again."
+          );
+          setDraft(text);
+        } else {
+          setErr(msg);
+        }
         // Roll back the optimistic assistant placeholder if the request died
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant" && !last.content && !(last.toolCalls?.length)) {
+            // Also remove the user message that has no persisted partner —
+            // they'll resend with their restored draft
+            const second = prev[prev.length - 2];
+            if (isInterrupt && second?.role === "user" && second.content === text) {
+              return prev.slice(0, -2);
+            }
             return prev.slice(0, -1);
           }
           return prev;
@@ -214,6 +260,7 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
 
         <div className="flex items-end gap-2">
           <textarea
+            ref={composerRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -223,8 +270,8 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
               }
             }}
             rows={1}
-            placeholder="Message Lens — niche, a video URL, a hook idea, a comment block…"
-            className="max-h-[40dvh] min-h-[48px] flex-1 resize-none rounded-xl border border-border bg-bg-elevated px-4 py-3 text-sm text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
+            placeholder="Message Lens — niche, a video URL, a hook idea…"
+            className="max-h-[40dvh] min-h-[48px] flex-1 resize-none rounded-xl border border-border bg-bg-elevated px-3 py-3 text-sm text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none sm:px-4"
           />
           <button
             type="submit"
@@ -238,7 +285,7 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
           <p className="mt-2 text-xs text-danger">Error: {err}</p>
         ) : null}
         <p className="mt-2 text-center text-[10px] text-fg-subtle">
-          Lens drafts. You ship. Nothing is published without your say-so.
+          Lens drafts. You ship. <kbd className="rounded border border-border bg-bg-elevated px-1 py-0.5 font-mono text-[9px]">⌘K</kbd> new chat · <kbd className="rounded border border-border bg-bg-elevated px-1 py-0.5 font-mono text-[9px]">⌘/</kbd> focus
         </p>
       </form>
     </main>
@@ -557,7 +604,14 @@ function MessageRow({
             {hasContent ? (
               <div className="rounded-2xl rounded-bl-md border border-border bg-bg-elevated px-4 py-3 text-sm">
                 <div className="prose prose-sm prose-invert max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      pre: ({ children, ...props }) => (
+                        <CopyableCodeBlock {...props}>{children}</CopyableCodeBlock>
+                      ),
+                    }}
+                  >
                     {m.content}
                   </ReactMarkdown>
                 </div>
@@ -806,6 +860,36 @@ function SaveScriptButton({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CopyableCodeBlock({
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLPreElement>) {
+  const ref = useRef<HTMLPreElement | null>(null);
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="group relative">
+      <pre {...props} ref={ref}>
+        {children}
+      </pre>
+      <button
+        type="button"
+        onClick={() => {
+          const text = ref.current?.innerText ?? "";
+          if (!text) return;
+          navigator.clipboard?.writeText(text).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          });
+        }}
+        className="absolute right-2 top-2 rounded border border-border bg-bg/80 px-2 py-0.5 text-[10px] text-fg-muted opacity-0 transition group-hover:opacity-100 hover:border-accent/40 hover:text-fg"
+        aria-label="Copy code"
+      >
+        {copied ? "✓ Copied" : "Copy"}
+      </button>
     </div>
   );
 }

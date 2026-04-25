@@ -5,6 +5,7 @@ import { dirname, join } from "path";
 import { anthropic, LENS_MODEL, LENS_MAX_TOKENS } from "./client.js";
 import { TOOLS, EXECUTORS } from "./tools/index.js";
 import { loadProfileSummary } from "./profile.js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const PROMPT_PATH = (() => {
   try {
@@ -149,17 +150,7 @@ export async function runLens(params: {
     // Execute each tool call and attach results
     const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
     for (const call of toolUses) {
-      const exec = EXECUTORS[call.name];
-      let output: string;
-      if (!exec) {
-        output = `Unknown tool: ${call.name}`;
-      } else {
-        try {
-          output = await exec(call.input as Record<string, unknown>, { userId });
-        } catch (err) {
-          output = `Tool error: ${err instanceof Error ? err.message : String(err)}`;
-        }
-      }
+      const output = await runToolWithTelemetry(call.name, call.input, userId);
       toolCalls.push({ name: call.name, input: call.input, output });
       toolResults.push({
         type: "tool_result",
@@ -312,19 +303,7 @@ export async function* streamLens(params: {
         name: call.name,
         input: call.input,
       };
-      const exec = EXECUTORS[call.name];
-      let output: string;
-      if (!exec) {
-        output = `Unknown tool: ${call.name}`;
-      } else {
-        try {
-          output = await exec(call.input as Record<string, unknown>, { userId });
-        } catch (err) {
-          output = `Tool error: ${
-            err instanceof Error ? err.message : String(err)
-          }`;
-        }
-      }
+      const output = await runToolWithTelemetry(call.name, call.input, userId);
       toolCalls.push({ name: call.name, input: call.input, output });
       toolResults.push({
         type: "tool_result",
@@ -347,4 +326,79 @@ export async function* streamLens(params: {
     type: "done",
     result: { reply, toolCalls, stopReason, usage },
   };
+}
+
+/**
+ * Wrap a tool execution with telemetry: time it, persist to tool_runs,
+ * and produce a clearer error string than "Tool error: ..." when it fails.
+ *
+ * Telemetry insert is fire-and-forget (no await) so a slow DB doesn't
+ * delay the response.
+ */
+async function runToolWithTelemetry(
+  toolName: string,
+  input: unknown,
+  userId: string
+): Promise<string> {
+  const exec = EXECUTORS[toolName];
+  if (!exec) return `Unknown tool: ${toolName}`;
+
+  const t0 = Date.now();
+  let output = "";
+  let success = true;
+  let errorMessage: string | null = null;
+
+  try {
+    output = await exec(input as Record<string, unknown>, { userId });
+  } catch (err) {
+    success = false;
+    const raw = err instanceof Error ? err.message : String(err);
+    errorMessage = raw;
+    // Surface a more useful error to Lens (and downstream to the user)
+    output = humanizeToolError(toolName, raw);
+  }
+
+  const duration_ms = Date.now() - t0;
+
+  // Persist tool run telemetry — best-effort, never blocks the response
+  void supabaseAdmin()
+    .from("tool_runs")
+    .insert({
+      user_id: userId,
+      tool_name: toolName,
+      duration_ms,
+      success,
+      error_message: errorMessage ?? null,
+      input_size: JSON.stringify(input ?? {}).length,
+      output_size: output.length,
+    })
+    .then(() => {
+      // intentionally unawaited
+    });
+
+  return output;
+}
+
+function humanizeToolError(toolName: string, raw: string): string {
+  // Apify-specific error patterns
+  if (/Apify 403/i.test(raw)) {
+    return `Couldn't run \`${toolName}\` — TikTok blocked the scrape (403). The post may be region-locked or private. Have the creator paste the hook + transcript and we can still work with the text.`;
+  }
+  if (/Apify 429/i.test(raw)) {
+    return `Couldn't run \`${toolName}\` — Apify rate-limited us. Try again in 30 seconds.`;
+  }
+  if (/Apify 5\d\d/i.test(raw)) {
+    return `Couldn't run \`${toolName}\` — Apify is having trouble (server error). Already retried 3 times. Try again in a minute.`;
+  }
+  if (/AbortError|timeout/i.test(raw)) {
+    return `\`${toolName}\` timed out after retries. Could be a slow profile or transient network issue. Try again, or paste the data manually.`;
+  }
+  if (/ANTHROPIC_API_KEY|anthropic/i.test(raw)) {
+    return `\`${toolName}\` couldn't reach the AI service. This is on our end — try again in a moment.`;
+  }
+  if (/SUPABASE|supabase|PGRST/i.test(raw)) {
+    return `\`${toolName}\` couldn't write to the database. This is on our end — your work isn't lost, try again.`;
+  }
+  // Default: still better than "Tool error: ..."
+  return `\`${toolName}\` ran into a problem: ${raw.slice(0, 200)}`;
 }

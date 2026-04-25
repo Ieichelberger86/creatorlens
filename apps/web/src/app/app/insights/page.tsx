@@ -228,13 +228,14 @@ function EmptyState() {
         Your stats fill in as Lens analyzes your videos.
       </h2>
       <p className="mx-auto mb-6 max-w-md text-sm text-fg-muted">
-        Onboarding pulls your last 10 automatically. After that, drop a TikTok
-        URL in chat or run a post-mortem on a recent post and the numbers
-        compound here.
+        If you just signed up, your last 10 videos should already be here —
+        if this still shows empty, the scrape probably hit a private/region-
+        locked profile. Run a post-mortem on a recent post or drop a URL in
+        chat to fill in.
       </p>
       <div className="flex flex-wrap justify-center gap-2">
         <Link href={"/app" as Route} className="btn-primary text-sm">
-          Drop a URL in chat
+          Run a post-mortem
         </Link>
         <Link href={"/app/calendar" as Route} className="btn-secondary text-sm">
           Plan content instead

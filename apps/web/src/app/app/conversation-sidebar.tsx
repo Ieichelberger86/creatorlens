@@ -1,8 +1,7 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createNewConversation } from "./conversations/actions";
 import { SidebarToggle } from "./sidebar-toggle";
+import { ConversationItem } from "./conversation-item";
 
 type ConvRow = {
   id: string;
@@ -54,18 +53,7 @@ export async function ConversationSidebar({
                 const active = c.id === activeId;
                 return (
                   <li key={c.id}>
-                    <Link
-                      href={`/app/c/${c.id}` as Route}
-                      className={
-                        "block truncate rounded-lg px-3 py-2 text-sm transition " +
-                        (active
-                          ? "bg-accent/15 text-fg"
-                          : "text-fg-muted hover:bg-bg-elevated hover:text-fg")
-                      }
-                      title={label}
-                    >
-                      {label}
-                    </Link>
+                    <ConversationItem id={c.id} label={label} active={active} />
                   </li>
                 );
               })
