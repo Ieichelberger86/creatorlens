@@ -13,6 +13,36 @@ const nextConfig = {
     "@anthropic-ai/sdk",
     "replicate",
   ],
+  // Force proxy-agent + its proxy backends into the serverless bundle.
+  // apify-client require()'s these dynamically, which Vercel's static tracer
+  // misses, causing the cron functions to fail at runtime with "Cannot find
+  // module 'proxy-agent'".
+  outputFileTracingIncludes: {
+    "/api/cron/competitor-watch": [
+      "../../node_modules/.pnpm/proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/pac-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/http-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/https-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/socks-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/agent-base@*/node_modules/**",
+    ],
+    "/api/cron/auto-postmortem": [
+      "../../node_modules/.pnpm/proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/pac-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/http-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/https-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/socks-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/agent-base@*/node_modules/**",
+    ],
+    "/api/chat": [
+      "../../node_modules/.pnpm/proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/pac-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/http-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/https-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/socks-proxy-agent@*/node_modules/**",
+      "../../node_modules/.pnpm/agent-base@*/node_modules/**",
+    ],
+  },
   webpack: (config) => {
     // Allow workspace packages to use `.js` import specifiers that point to `.ts` source
     // (required because the packages themselves are NodeNext-friendly for the API/agent builds).
