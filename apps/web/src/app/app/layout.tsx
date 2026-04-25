@@ -44,7 +44,7 @@ export default async function AppLayout({
               {tier === "admin" ? "admin" : "vanguard alpha"}
             </span>
           </Link>
-          <nav className="flex items-center gap-4 text-sm text-fg-muted">
+          <nav className="hidden items-center gap-4 text-sm text-fg-muted sm:flex">
             <Link href={"/app" as Route} className="hover:text-fg transition">
               Chat
             </Link>
@@ -54,11 +54,19 @@ export default async function AppLayout({
             >
               Calendar
             </Link>
+            <Link
+              href={"/app/insights" as Route}
+              className="hover:text-fg transition"
+            >
+              Insights
+            </Link>
           </nav>
         </div>
-        <div className="flex items-center gap-4 text-xs text-fg-muted">
-          {handle ? <span className="font-mono">@{handle}</span> : null}
-          <span>{display}</span>
+        <div className="flex items-center gap-3 text-xs text-fg-muted sm:gap-4">
+          {handle ? (
+            <span className="hidden font-mono md:inline">@{handle}</span>
+          ) : null}
+          <span className="hidden truncate max-w-[16ch] md:inline">{display}</span>
           <form action="/auth/sign-out" method="POST">
             <button type="submit" className="hover:text-fg transition">
               Sign out

@@ -10,6 +10,21 @@
   body {
     @apply bg-bg text-fg font-sans antialiased;
     min-height: 100dvh;
+    /* iOS safe areas — composer sits above the home-bar */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Prevent iOS zoom-on-focus by ensuring inputs are at least 16px */
+  @media (max-width: 640px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="url"],
+    input[type="search"],
+    input[type="datetime-local"],
+    textarea,
+    select {
+      font-size: 16px;
+    }
   }
 
   ::selection {
