@@ -122,6 +122,16 @@
     border-color: theme("colors.border.DEFAULT");
     margin: 1em 0;
   }
+  .prose img {
+    max-width: 100%;
+    width: auto;
+    border-radius: 0.75rem;
+    border: 1px solid theme("colors.border.DEFAULT");
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+    /* Cap thumbnail height so 9:16 doesn't dominate the chat */
+    max-height: 60vh;
+  }
 }
 
 @layer components {

@@ -17,6 +17,10 @@ import {
   updateCalendarEntryTool,
   updateCalendarEntryExecutor,
 } from "./update-calendar-entry.js";
+import {
+  generateThumbnailTool,
+  generateThumbnailExecutor,
+} from "./generate-thumbnail.js";
 
 export type ToolExecutor = (
   input: Record<string, unknown>,
@@ -30,6 +34,7 @@ export const TOOLS: Anthropic.Tool[] = [
   analyzeTiktokVideoTool,
   mineCommentsTool,
   postMortemTool,
+  generateThumbnailTool,
   scheduleContentTool,
   listCalendarTool,
   updateCalendarEntryTool,
@@ -42,6 +47,7 @@ export const EXECUTORS: Record<string, ToolExecutor> = {
   analyze_tiktok_video: analyzeTiktokVideoExecutor,
   mine_comments: mineCommentsExecutor,
   post_mortem: postMortemExecutor,
+  generate_thumbnail: generateThumbnailExecutor,
   schedule_content: scheduleContentExecutor,
   list_calendar: listCalendarExecutor,
   update_calendar_entry: updateCalendarEntryExecutor,
