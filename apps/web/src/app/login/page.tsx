@@ -57,7 +57,13 @@ export default async function LoginPage({ searchParams }: PageProps) {
         )}
       </div>
 
-      <div className="relative z-10 mt-6 text-center">
+      <div className="relative z-10 mt-6 flex flex-col items-center gap-3 text-center">
+        <a
+          href="/demo"
+          className="rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-sm font-medium text-accent transition hover:bg-accent/20"
+        >
+          ✨ Try the demo (no signup)
+        </a>
         <Link href="/" className="text-sm text-fg-muted hover:text-fg">
           ← back home
         </Link>
