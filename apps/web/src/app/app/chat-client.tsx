@@ -44,6 +44,7 @@ const TOOL_LABEL: Record<string, string> = {
   schedule_content: "Adding to your calendar",
   list_calendar: "Reading your calendar",
   update_calendar_entry: "Updating calendar entry",
+  set_goals: "Setting your 90-day goals",
 };
 
 export function ChatClient({ initial }: { initial: InitialConversation }) {

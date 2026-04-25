@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runProfileAudit } from "@/lib/lens/audit";
+import { setGoalsFromAudit } from "@/lib/lens/goal-setter";
 
 const STREAMS = [
   "live_gifts",
@@ -114,15 +115,37 @@ export async function saveOnboarding(
     limit: 10,
   });
 
+  // 4. Decompose the 90-day goal into structured goals + action plans
+  // (best-effort — onboarding completes even if this step fails)
+  let goalsBlock = "";
+  if (audit.ok) {
+    try {
+      const goalsRes = await setGoalsFromAudit({
+        userId: user.id,
+        handle: tiktok_handle,
+        niche,
+        ninetyDayGoal: ninety_day_goal,
+        monetizationStreams: monetization_streams,
+        audit: audit.opener,
+        baseline: audit.baseline,
+      });
+      goalsBlock = goalsRes.goalsSummaryMarkdown;
+    } catch {
+      goalsBlock = "";
+    }
+  }
+
+  const fullOpener = audit.opener + goalsBlock;
+
   const now = new Date().toISOString();
   await admin.from("conversations").insert({
     user_id: user.id,
     channel: "web",
-    title: audit.ok ? "Profile audit" : "Welcome",
+    title: audit.ok ? "Profile audit + goals" : "Welcome",
     messages: [
       {
         role: "assistant",
-        content: audit.opener,
+        content: fullOpener,
         created_at: now,
       },
     ],

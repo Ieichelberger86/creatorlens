@@ -2,11 +2,23 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { anthropic, LENS_MODEL } from "./client.js";
 import { scrapeTikTokProfile, fetchSubtitleText, type TikTokPost } from "./apify.js";
 
+type AuditBaseline = {
+  followers: number | null;
+  median_views: number | null;
+  avg_views: number | null;
+  posts_per_week: number | null;
+  like_rate_pct: number | null;
+  save_rate_pct: number | null;
+  comment_rate_pct: number | null;
+  videos_analyzed: number;
+};
+
 type AuditResult = {
   ok: boolean;
   videosAnalyzed: number;
   opener: string;
   fallbackReason?: string;
+  baseline: AuditBaseline;
 };
 
 /**
@@ -213,6 +225,16 @@ No preamble. No explanation. Just those two sections.`,
         niche,
         ninetyDayGoal,
       }),
+      baseline: {
+        followers: null,
+        median_views: null,
+        avg_views: null,
+        posts_per_week: null,
+        like_rate_pct: null,
+        save_rate_pct: null,
+        comment_rate_pct: null,
+        videos_analyzed: 0,
+      },
     };
   }
 
@@ -391,7 +413,21 @@ ${JSON.stringify(compactPosts, null, 2)}`,
     opener = defaultOpener({ handle: cleanHandle, niche, ninetyDayGoal });
   }
 
-  return { ok: true, videosAnalyzed: posts.length, opener };
+  return {
+    ok: true,
+    videosAnalyzed: posts.length,
+    opener,
+    baseline: {
+      followers: followerCount ?? null,
+      median_views: median || null,
+      avg_views: avg || null,
+      posts_per_week: postsPerWeek,
+      like_rate_pct: likeRatePct || null,
+      save_rate_pct: saveRatePct || null,
+      comment_rate_pct: commentRatePct || null,
+      videos_analyzed: posts.length,
+    },
+  };
 }
 
 function defaultOpener(args: {

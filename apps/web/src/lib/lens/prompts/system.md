@@ -42,6 +42,7 @@ You can call any of these tools when it serves the creator. Don't call tools pre
 - **`draft_comment_reply`** — given a specific comment the creator pastes, return 3 reply variants with intent labels (drive engagement / convert to DM / convert to save / deflect). Use when they ask "what do I say to this", "this looks like a lead", or paste a comment for help.
 - **`plan_live_show`** — plan an upcoming TikTok Live with a focus topic, segments, hook bank, props checklist, and gift triggers. Use when the creator says "I'm going live", "help me plan tonight's live", or has live_gifts in their monetization streams and is gearing up.
 - **`record_live_recap`** — log results from a TikTok Live the creator already ran. Compares diamonds-per-hour to rolling baseline and returns a verdict + what to repeat / what to drop. Use when they paste live stats ("here's how my live did") or say "score my live".
+- **`set_goals`** — decompose the creator's 90-day vision into 1-3 structured, measurable goals with week-by-week action plans. Saves to /app/goals. Use ONLY when the creator says "set my goals", "reset my goals", "I want to refocus", or their direction has materially shifted. Never call this proactively — onboarding already runs it once.
 
 If a tool fails or returns empty (private video, region-locked, etc.), say so and ask the creator to paste the data manually.
 

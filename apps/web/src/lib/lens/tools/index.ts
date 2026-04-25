@@ -43,6 +43,7 @@ import {
   draftCommentReplyTool,
   draftCommentReplyExecutor,
 } from "./draft-comment-reply.js";
+import { setGoalsTool, setGoalsExecutor } from "./set-goals.js";
 
 export type ToolExecutor = (
   input: Record<string, unknown>,
@@ -67,6 +68,7 @@ export const TOOLS: Anthropic.Tool[] = [
   scheduleContentTool,
   listCalendarTool,
   updateCalendarEntryTool,
+  setGoalsTool,
 ];
 
 export const EXECUTORS: Record<string, ToolExecutor> = {
@@ -87,4 +89,5 @@ export const EXECUTORS: Record<string, ToolExecutor> = {
   schedule_content: scheduleContentExecutor,
   list_calendar: listCalendarExecutor,
   update_calendar_entry: updateCalendarEntryExecutor,
+  set_goals: setGoalsExecutor,
 };
