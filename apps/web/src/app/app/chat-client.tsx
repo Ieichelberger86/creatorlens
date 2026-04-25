@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { saveDraftToCalendar } from "./conversations/actions";
 
 type ToolCall = {
   id: string;
@@ -10,6 +11,7 @@ type ToolCall = {
   input: unknown;
   status: "running" | "done";
   preview?: string;
+  output?: string;
 };
 
 type Message = {
@@ -50,9 +52,7 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pending]);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = draft.trim();
+  function send(text: string) {
     if (!text || pending) return;
     setErr(null);
 
@@ -138,6 +138,11 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
     });
   }
 
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    send(draft.trim());
+  }
+
   const empty = messages.length === 0;
 
   return (
@@ -161,7 +166,12 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
         ) : (
           <div className="space-y-6">
             {messages.map((m, i) => (
-              <MessageRow key={i} m={m} />
+              <MessageRow
+                key={i}
+                m={m}
+                conversationId={conversationId}
+                onSend={send}
+              />
             ))}
           </div>
         )}
@@ -286,6 +296,7 @@ function applyEvent(
                 ...c,
                 status: "done" as const,
                 preview: event.output.slice(0, 120),
+                output: event.output,
               }
             : c
         );
@@ -297,7 +308,15 @@ function applyEvent(
   }
 }
 
-function MessageRow({ m }: { m: Message }) {
+function MessageRow({
+  m,
+  conversationId,
+  onSend,
+}: {
+  m: Message;
+  conversationId: string | null;
+  onSend: (text: string) => void;
+}) {
   const isUser = m.role === "user";
   const hasContent = m.content.length > 0;
   const showThinking =
@@ -332,8 +351,192 @@ function MessageRow({ m }: { m: Message }) {
                 </div>
               </div>
             ) : null}
+            {/* Quick-action chains: render cards based on completed tool calls */}
+            {m.toolCalls
+              ?.filter((c) => c.status === "done" && c.output)
+              .map((c) => (
+                <ToolActions
+                  key={"actions-" + c.id}
+                  call={c}
+                  conversationId={conversationId}
+                  onSend={onSend}
+                />
+              ))}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ToolActions({
+  call,
+  conversationId,
+  onSend,
+}: {
+  call: ToolCall;
+  conversationId: string | null;
+  onSend: (text: string) => void;
+}) {
+  if (call.name === "generate_hooks" && call.output) {
+    const hooks = parseHooks(call.output);
+    if (hooks.length === 0) return null;
+    return (
+      <div className="rounded-xl border border-border bg-bg-subtle p-3">
+        <div className="mb-2 text-[10px] uppercase tracking-wider text-fg-subtle">
+          Pick a hook → write the script
+        </div>
+        <div className="flex flex-col gap-2">
+          {hooks.slice(0, 10).map((h, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() =>
+                onSend(`Write a 30-second script for this hook:\n"${h}"`)
+              }
+              className="group flex items-start gap-3 rounded-lg border border-border bg-bg-elevated px-3 py-2 text-left text-sm transition hover:border-accent/40 hover:bg-bg"
+            >
+              <span className="mt-0.5 font-mono text-xs text-fg-subtle">{i + 1}.</span>
+              <span className="flex-1 text-fg-muted group-hover:text-fg">{h}</span>
+              <span className="hidden text-xs text-accent group-hover:inline">
+                Write script →
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (call.name === "draft_script" && call.output) {
+    const hookFromScript = parseHookFromScript(call.output);
+    return (
+      <SaveScriptButton
+        conversationId={conversationId}
+        hook={hookFromScript ?? null}
+        script={call.output}
+      />
+    );
+  }
+
+  return null;
+}
+
+function parseHooks(text: string): string[] {
+  const out: string[] = [];
+  for (const line of text.split("\n")) {
+    const m = line.match(/^\s*(?:\*\*)?(\d+)\.?\s*(?:\*\*)?\s*[*•\-]?\s*(.+?)(?:\*\*)?\s*$/);
+    if (m && m[2]) {
+      const cleaned = m[2]
+        .replace(/^\*\*|\*\*$/g, "")
+        .replace(/^["']|["']$/g, "")
+        .trim();
+      if (cleaned.length > 5 && cleaned.length < 200) out.push(cleaned);
+    }
+  }
+  return out;
+}
+
+function parseHookFromScript(text: string): string | null {
+  // Scripts start with HOOK (0–2s) or similar header followed by the line
+  const m = text.match(/HOOK[^\n]*\n+([^\n]+)/i);
+  return m?.[1]?.trim().replace(/^["']|["']$/g, "") ?? null;
+}
+
+function SaveScriptButton({
+  conversationId,
+  hook,
+  script,
+}: {
+  conversationId: string | null;
+  hook: string | null;
+  script: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+  const [saved, setSaved] = useState<string | null>(null);
+  const [title, setTitle] = useState(hook ? hook.slice(0, 80) : "New script");
+  const [scheduled, setScheduled] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+
+  if (saved) {
+    return (
+      <div className="rounded-xl border border-success/30 bg-success/5 p-3 text-xs text-success">
+        ✓ Saved to your calendar.{" "}
+        <a
+          href="/app/calendar"
+          className="underline hover:text-success/80"
+        >
+          Open calendar
+        </a>
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="btn-secondary text-xs"
+      >
+        + Save this script to calendar
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-bg-subtle p-3">
+      <div className="mb-2 text-[10px] uppercase tracking-wider text-fg-subtle">
+        Save script to calendar
+      </div>
+      <div className="flex flex-col gap-2 text-sm">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Title"
+          className="rounded-lg border border-border bg-bg-elevated px-3 py-2 text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
+        />
+        <input
+          type="datetime-local"
+          value={scheduled}
+          onChange={(e) => setScheduled(e.target.value)}
+          className="rounded-lg border border-border bg-bg-elevated px-3 py-2 text-fg focus:border-accent focus:outline-none"
+        />
+        <p className="text-[10px] text-fg-subtle">
+          Leave date empty to save as an idea.
+        </p>
+        {err ? <p className="text-xs text-danger">{err}</p> : null}
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="btn-secondary text-xs"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={pending || !title.trim()}
+            onClick={() => {
+              setErr(null);
+              start(async () => {
+                const result = await saveDraftToCalendar({
+                  title: title.trim(),
+                  hook,
+                  script,
+                  scheduledFor: scheduled || null,
+                  sourceConversationId: conversationId,
+                });
+                if (result.ok) setSaved(result.id ?? "saved");
+                else setErr(result.error ?? "Save failed");
+              });
+            }}
+            className="btn-primary text-xs"
+          >
+            {pending ? "Saving…" : "Save"}
+          </button>
+        </div>
       </div>
     </div>
   );

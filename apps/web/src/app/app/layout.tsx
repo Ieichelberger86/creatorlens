@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { SidebarOpenButton } from "./sidebar-toggle";
 
 export default async function AppLayout({
   children,
@@ -31,8 +32,9 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
-      <header className="relative z-10 flex items-center justify-between border-b border-border bg-bg-elevated/60 px-6 py-3 backdrop-blur">
-        <div className="flex items-center gap-6">
+      <header className="relative z-10 flex items-center justify-between border-b border-border bg-bg-elevated/60 px-4 py-3 backdrop-blur sm:px-6">
+        <div className="flex items-center gap-3 sm:gap-6">
+          <SidebarOpenButton />
           <Link href={"/app" as Route} className="flex items-center gap-2">
             <div className="h-5 w-5 rounded-md bg-accent" />
             <span className="font-display text-sm font-semibold tracking-tight">

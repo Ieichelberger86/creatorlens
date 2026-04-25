@@ -1,24 +1,17 @@
 import { redirect } from "next/navigation";
+import type { Route } from "next";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/supabase/server";
-import { ChatClient, type InitialConversation } from "./chat-client";
 
 export const dynamic = "force-dynamic";
 
-type StoredMessage = {
-  role: "user" | "assistant";
-  content: string;
-  created_at: string;
-};
-
 export default async function LensAppPage() {
   const user = await getSessionUser();
-  // Layout already gated; if we got here, user exists.
   if (!user) return null;
 
   const admin = supabaseAdmin();
 
-  // Onboarding gate — first-time creators answer 3 questions before chat.
+  // Onboarding gate
   const { data: profile } = await admin
     .from("creator_profile")
     .select("onboarded_at")
@@ -29,19 +22,33 @@ export default async function LensAppPage() {
     redirect("/app/onboarding");
   }
 
+  // Find the most recent web conversation; create one if none exists.
   const { data: conv } = await admin
     .from("conversations")
-    .select("id, messages, last_message_at")
+    .select("id")
     .eq("user_id", user.id)
     .eq("channel", "web")
     .order("last_message_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const initial: InitialConversation = {
-    conversationId: conv?.id ?? null,
-    messages: (conv?.messages as StoredMessage[] | null) ?? [],
-  };
+  if (conv?.id) {
+    redirect(`/app/c/${conv.id}` as Route);
+  }
 
-  return <ChatClient initial={initial} />;
+  const { data: created } = await admin
+    .from("conversations")
+    .insert({
+      user_id: user.id,
+      channel: "web",
+      title: null,
+      messages: [],
+      last_message_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (created?.id) redirect(`/app/c/${created.id}` as Route);
+  // If insert failed for some reason, just send them onboarding-side
+  redirect("/app/onboarding");
 }
