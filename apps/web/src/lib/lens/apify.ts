@@ -1,4 +1,10 @@
 import { ApifyClient } from "apify-client";
+// Force webpack/Vercel to trace proxy-agent into the serverless bundle —
+// apify-client require()s it dynamically inside utils.js, which static
+// analysis misses. This static import has no runtime effect (proxy-agent's
+// constructor isn't called) but it pulls the package into deps the tracer
+// can see.
+import "proxy-agent";
 
 let _client: ApifyClient | null = null;
 
