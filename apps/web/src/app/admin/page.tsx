@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { adminClient } from "@creatorlens/db";
 import { PRICING } from "@creatorlens/shared/pricing";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -23,6 +24,16 @@ type PreorderRow = {
   utm_campaign: string | null;
 };
 
+type UserUsageRow = {
+  id: string;
+  email: string;
+  tier: string;
+  tiktok_handle: string | null;
+  monthly_token_cap: number | null;
+  monthly_tokens_used: number;
+  created_at: string;
+};
+
 async function loadStats() {
   const db = adminClient();
   const { data, error } = await db
@@ -40,8 +51,24 @@ async function loadStats() {
   return { error: null, rows: (data ?? []) as PreorderRow[] };
 }
 
+async function loadUsers() {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("users")
+    .select(
+      "id, email, tier, tiktok_handle, monthly_token_cap, monthly_tokens_used, created_at"
+    )
+    .order("monthly_tokens_used", { ascending: false })
+    .limit(100);
+  return {
+    error: error?.message ?? null,
+    rows: (data ?? []) as UserUsageRow[],
+  };
+}
+
 export default async function AdminPage() {
   const { error, rows } = await loadStats();
+  const { error: usersErr, rows: users } = await loadUsers();
 
   const total = rows.length;
   const paid = rows.filter((r) => r.status === "paid").length;
@@ -100,6 +127,90 @@ export default async function AdminPage() {
             style={{ width: `${pctOfTarget}%` }}
           />
         </div>
+      </section>
+
+      <section className="mb-10">
+        <div className="mb-3 font-display text-lg font-semibold">
+          Lens users — token usage this month
+        </div>
+        {usersErr ? (
+          <div className="card border-danger/40 bg-danger/5 text-danger text-sm">
+            {usersErr}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-bg-elevated text-left text-xs uppercase tracking-wider text-fg-subtle">
+                <tr>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Tier</th>
+                  <th className="px-4 py-3">Used / Cap</th>
+                  <th className="px-4 py-3 w-1/4">Usage</th>
+                  <th className="px-4 py-3">Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-fg-muted">
+                      No Lens users yet.
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((u) => {
+                    const cap = u.monthly_token_cap;
+                    const used = u.monthly_tokens_used ?? 0;
+                    const pct =
+                      cap && cap > 0 ? Math.min(100, (used / cap) * 100) : 0;
+                    const overCap = cap !== null && cap !== undefined && used >= cap;
+                    return (
+                      <tr
+                        key={u.id}
+                        className="border-t border-border hover:bg-bg-elevated/50"
+                      >
+                        <td className="px-4 py-3 font-medium">
+                          {u.email}
+                          {u.tiktok_handle ? (
+                            <div className="text-xs text-fg-subtle font-mono">
+                              @{u.tiktok_handle}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent">
+                            {u.tier}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          {used.toLocaleString()} /{" "}
+                          {cap === null ? "∞" : cap.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg-elevated">
+                            <div
+                              className={
+                                "h-full rounded-full " +
+                                (overCap
+                                  ? "bg-danger"
+                                  : pct > 75
+                                    ? "bg-success"
+                                    : "bg-accent")
+                              }
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-fg-muted">
+                          {new Date(u.created_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section>

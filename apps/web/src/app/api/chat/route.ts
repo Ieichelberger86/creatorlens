@@ -6,6 +6,7 @@ import { runLens, type LensMessage } from "@/lib/lens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 const BodySchema = z.object({
   conversation_id: z.string().uuid().optional(),
@@ -29,15 +30,36 @@ export async function POST(req: Request) {
   const userId = auth.user.id;
   const admin = supabaseAdmin();
 
-  // Check tier gate
+  // Check tier gate + token cap
   const { data: userRow } = await admin
     .from("users")
-    .select("tier")
+    .select(
+      "tier, monthly_token_cap, monthly_tokens_used, monthly_period_start"
+    )
     .eq("id", userId)
     .single();
   const tier = userRow?.tier ?? "preorder";
   if (tier !== "vanguard" && tier !== "admin") {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  const cap = userRow?.monthly_token_cap;
+  const used = userRow?.monthly_tokens_used ?? 0;
+  if (cap !== null && cap !== undefined && used >= cap) {
+    // Compute next reset (first of next UTC month)
+    const now = new Date();
+    const reset = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+    );
+    return NextResponse.json(
+      {
+        error: "monthly_cap_reached",
+        used,
+        cap,
+        resets_at: reset.toISOString(),
+      },
+      { status: 429 }
+    );
   }
 
   const parsed = BodySchema.safeParse(await req.json().catch(() => ({})));
@@ -129,10 +151,19 @@ export async function POST(req: Request) {
     })
     .eq("id", conversation_id);
 
+  // Tick the user's monthly token meter (atomic, handles month rollover)
+  await admin.rpc("tick_token_meter", {
+    p_user_id: userId,
+    p_input_tokens: result.usage.inputTokens + result.usage.cacheCreationTokens,
+    p_output_tokens:
+      result.usage.outputTokens + result.usage.cacheReadTokens, // bundle cache reads here so totals add up
+  });
+
   return NextResponse.json({
     conversation_id,
     reply: assistantStored.content,
     tool_calls: result.toolCalls,
     stop_reason: result.stopReason,
+    usage: result.usage,
   });
 }

@@ -10,6 +10,8 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
+// Profile audit + Claude opener can take 30-60s; allow up to 120s.
+export const maxDuration = 120;
 
 export default async function OnboardingPage() {
   const user = await getSessionUser();

@@ -36,6 +36,10 @@ create table if not exists public.users (
   discord_user_id       text unique,
   display_name          text,
   tiktok_handle         text,
+  -- monthly token cap (null = unlimited; 0 = blocked); resets on UTC month boundary
+  monthly_token_cap     bigint default 500000,
+  monthly_tokens_used   bigint not null default 0,
+  monthly_period_start  timestamptz not null default date_trunc('month', now() at time zone 'utc'),
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );

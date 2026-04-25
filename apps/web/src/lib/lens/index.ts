@@ -45,6 +45,13 @@ export type LensRunResult = {
   reply: string;
   toolCalls: Array<{ name: string; input: unknown; output: string }>;
   stopReason: Anthropic.Messages.Message["stop_reason"] | null;
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens: number;
+    cacheReadTokens: number;
+    totalTokens: number;
+  };
 };
 
 /**
@@ -72,6 +79,27 @@ export async function runLens(params: {
 
   const toolCalls: LensRunResult["toolCalls"] = [];
 
+  // Prompt caching: system + tools are stable across turns within a 5-min
+  // window, so cache them. Subsequent turns pay 0.1x for cached tokens
+  // instead of full input rate. The LAST tool gets the cache_control marker,
+  // which caches it and everything before it (the full tools array).
+  const cachedSystem: Anthropic.Messages.TextBlockParam[] = [
+    { type: "text", text: system, cache_control: { type: "ephemeral" } },
+  ];
+  const cachedTools: Anthropic.Tool[] = TOOLS.map((t, i) =>
+    i === TOOLS.length - 1
+      ? { ...t, cache_control: { type: "ephemeral" } }
+      : t
+  );
+
+  const usage: LensRunResult["usage"] = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: 0,
+  };
+
   // Tool-use loop: keep going until Claude returns end_turn.
   // Hard cap on iterations to avoid runaway loops.
   const MAX_ITERS = 6;
@@ -82,12 +110,16 @@ export async function runLens(params: {
     const res = await client.messages.create({
       model: LENS_MODEL,
       max_tokens: LENS_MAX_TOKENS,
-      system,
-      tools: TOOLS,
+      system: cachedSystem,
+      tools: cachedTools,
       messages,
     });
 
     stopReason = res.stop_reason;
+    usage.inputTokens += res.usage?.input_tokens ?? 0;
+    usage.outputTokens += res.usage?.output_tokens ?? 0;
+    usage.cacheCreationTokens += res.usage?.cache_creation_input_tokens ?? 0;
+    usage.cacheReadTokens += res.usage?.cache_read_input_tokens ?? 0;
 
     // Extract any text output from this turn
     const textBlocks = res.content.filter(
@@ -132,5 +164,11 @@ export async function runLens(params: {
     messages.push({ role: "user", content: toolResults });
   }
 
-  return { reply, toolCalls, stopReason };
+  usage.totalTokens =
+    usage.inputTokens +
+    usage.outputTokens +
+    usage.cacheCreationTokens +
+    usage.cacheReadTokens;
+
+  return { reply, toolCalls, stopReason, usage };
 }

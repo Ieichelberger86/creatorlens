@@ -48,6 +48,20 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ conversation_id: conversationId, message: text }),
         });
+        if (res.status === 429) {
+          const body = (await res.json().catch(() => ({}))) as {
+            resets_at?: string;
+          };
+          const resetDate = body.resets_at
+            ? new Date(body.resets_at).toLocaleDateString(undefined, {
+                month: "long",
+                day: "numeric",
+              })
+            : "the start of next month";
+          throw new Error(
+            `You've used this month's Lens budget. Resets ${resetDate}. Reach out to ian@iepropertymgmt.com if you need more headroom now.`
+          );
+        }
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.detail || body.error || `HTTP ${res.status}`);

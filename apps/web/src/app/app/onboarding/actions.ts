@@ -6,9 +6,6 @@ import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runProfileAudit } from "@/lib/lens/audit";
 
-// Profile audit + opener generation can take 30-60s; allow up to 120s.
-export const maxDuration = 120;
-
 const Schema = z.object({
   tiktok_handle: z
     .string()
