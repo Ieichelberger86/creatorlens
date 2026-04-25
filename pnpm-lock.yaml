@@ -142,6 +142,9 @@ importers:
       posthog-js:
         specifier: ^1.181.0
         version: 1.371.4
+      proxy-agent:
+        specifier: ^6.4.0
+        version: 6.5.0
       react:
         specifier: ^18.3.1
         version: 18.3.1
