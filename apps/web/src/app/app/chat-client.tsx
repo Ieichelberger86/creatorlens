@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { saveDraftToCalendar, createNewConversation } from "./conversations/actions";
@@ -50,6 +50,7 @@ const TOOL_LABEL: Record<string, string> = {
 
 export function ChatClient({ initial }: { initial: InitialConversation }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [conversationId, setConversationId] = useState<string | null>(
     initial.conversationId
   );
@@ -59,10 +60,28 @@ export function ChatClient({ initial }: { initial: InitialConversation }) {
   const [pending, start] = useTransition();
   const endRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const autoFiredRef = useRef<boolean>(false);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pending]);
+
+  // Dashboard handoff: ?send=<message> → auto-fire the message once on mount
+  useEffect(() => {
+    if (autoFiredRef.current) return;
+    const seedMessage = searchParams?.get("send");
+    if (!seedMessage || messages.length > 0) return;
+    autoFiredRef.current = true;
+    // Strip the query param so refresh doesn't re-fire
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("send");
+      window.history.replaceState({}, "", url.toString());
+    }
+    // Defer one tick so React renders the layout before the message appears
+    setTimeout(() => send(seedMessage), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keyboard shortcuts: Cmd/Ctrl+K = new chat, Cmd/Ctrl+/ = focus composer,
   // Esc = clear composer

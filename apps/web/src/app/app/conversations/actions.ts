@@ -28,6 +28,37 @@ export async function createNewConversation(): Promise<void> {
   redirect(`/app/c/${data.id}` as Route);
 }
 
+/**
+ * Create a brand-new conversation, seed it with the user's first message,
+ * and redirect into it with a query flag so chat-client picks up the
+ * pending prompt and auto-sends. Used by the dashboard hero composer.
+ */
+export async function createConversationFromPrompt(formData: FormData): Promise<void> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
+  const message = String(formData.get("message") ?? "").trim();
+  if (!message) redirect("/app" as Route);
+
+  const admin = supabaseAdmin();
+  const { data } = await admin
+    .from("conversations")
+    .insert({
+      user_id: user.id,
+      channel: "web",
+      title: null,
+      messages: [],
+      last_message_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (!data) redirect("/app" as Route);
+  revalidatePath("/app");
+  // ?send=<encoded> tells chat-client to auto-fire the message on mount
+  redirect(`/app/c/${data.id}?send=${encodeURIComponent(message)}` as Route);
+}
+
 export async function deleteConversation(id: string) {
   const user = await getSessionUser();
   if (!user) return { ok: false };
