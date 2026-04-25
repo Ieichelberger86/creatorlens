@@ -4,6 +4,15 @@ const nextConfig = {
   transpilePackages: ["@creatorlens/db", "@creatorlens/shared"],
   typedRoutes: true,
   outputFileTracingRoot: new URL("../..", import.meta.url).pathname,
+  // apify-client uses dynamic requires for proxy-agent and node-fetch internals
+  // that webpack can't statically analyze. Externalize so the serverless
+  // bundle uses Node's runtime resolution against node_modules.
+  serverExternalPackages: [
+    "apify-client",
+    "proxy-agent",
+    "@anthropic-ai/sdk",
+    "replicate",
+  ],
   webpack: (config) => {
     // Allow workspace packages to use `.js` import specifiers that point to `.ts` source
     // (required because the packages themselves are NodeNext-friendly for the API/agent builds).
