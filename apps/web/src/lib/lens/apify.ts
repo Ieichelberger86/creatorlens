@@ -97,6 +97,9 @@ export async function scrapeTikTokPost(
   const client = apify();
   if (!client) throw new Error("APIFY_TOKEN not configured");
 
+  const wantComments = !!opts?.withComments;
+  const commentsLimit = opts?.commentsLimit ?? 50;
+
   const input: Record<string, unknown> = {
     postURLs: [url],
     resultsPerPage: 1,
@@ -105,19 +108,56 @@ export async function scrapeTikTokPost(
     shouldDownloadSubtitles: true,
     proxyConfiguration: { useApifyProxy: true },
   };
-  if (opts?.withComments) {
+  if (wantComments) {
     input.shouldDownloadComments = true;
-    input.commentsPerPost = opts.commentsLimit ?? 50;
+    input.commentsPerPost = commentsLimit;
   }
 
-  // Sync run with 90s wait — fail fast if cold start drags.
   const run = await client.actor(TIKTOK_SCRAPER).call(input, {
-    timeout: 120,
-    waitSecs: 120,
+    timeout: 180,
+    waitSecs: 180,
   });
 
   const dataset = await client.dataset(run.defaultDatasetId).listItems({ limit: 1 });
-  return (dataset.items[0] as TikTokPost | undefined) ?? null;
+  const post = (dataset.items[0] as TikTokPost & {
+    commentsDatasetUrl?: string;
+  } | undefined) ?? null;
+
+  if (!post) return null;
+
+  // The actor emits comments to a SEPARATE dataset; the URL lives on the post.
+  // Pull and reattach if requested.
+  if (wantComments) {
+    const commentsUrl = (post as { commentsDatasetUrl?: string }).commentsDatasetUrl;
+    if (commentsUrl) {
+      const m = commentsUrl.match(/datasets\/([^/?]+)/);
+      if (m) {
+        try {
+          const cds = await client.dataset(m[1]).listItems({ limit: commentsLimit });
+          const raws = cds.items as Array<Record<string, unknown>>;
+          post.comments = raws
+            .map((c) => {
+              const uniqueId =
+                (c.uniqueId as string | undefined) ??
+                ((c.user as { uniqueId?: string } | undefined)?.uniqueId);
+              const nickname = (c.user as { nickname?: string } | undefined)?.nickname;
+              return {
+                text: (c.text as string | undefined) ?? "",
+                diggCount: (c.diggCount as number | undefined) ?? 0,
+                createTime: (c.createTime as number | undefined) ?? 0,
+                user: uniqueId ? { uniqueId, nickname } : undefined,
+              };
+            })
+            .filter((c) => c.text);
+        } catch {
+          // If the comments dataset fetch fails, leave comments empty — caller
+          // already handles that gracefully.
+        }
+      }
+    }
+  }
+
+  return post;
 }
 
 /**
