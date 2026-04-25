@@ -43,12 +43,12 @@ export function OnboardingForm() {
       ) : null}
 
       <button type="submit" disabled={pending} className="btn-primary mt-2">
-        {pending ? "Saving…" : "Meet Lens →"}
+        {pending ? "Studying your last 10 videos… (~30s)" : "Meet Lens →"}
       </button>
 
       <p className="text-center text-[11px] text-fg-subtle">
-        You can edit any of this later. Lens learns more about you with every
-        conversation.
+        Lens will pull your last 10 TikToks and have a real take ready before
+        you reply. You can edit any of this later.
       </p>
     </form>
   );

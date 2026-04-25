@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { runProfileAudit } from "@/lib/lens/audit";
+
+// Profile audit + opener generation can take 30-60s; allow up to 120s.
+export const maxDuration = 120;
 
 const Schema = z.object({
   tiktok_handle: z
@@ -83,22 +87,26 @@ export async function saveOnboarding(
     .update({ tiktok_handle, display_name: `@${tiktok_handle}` })
     .eq("id", user.id);
 
-  // 3. Seed a personalized opener conversation so /app isn't a cold start
-  const opener = `Got it — you're on **@${tiktok_handle}** doing _${niche}_, chasing **${ninety_day_goal}** over the next 90 days. Solid focus.
-
-Let's open with a quick content audit. Paste me **1–3 of your best recent videos** — TikTok links or just the hooks if that's faster — and I'll pull the patterns we can lean into.
-
-If you'd rather start from scratch, just tell me the next video idea on your mind and we'll build the hook from there.`;
+  // 3. Live profile audit + personalized opener
+  // Best-effort — if the scrape fails, runProfileAudit returns a fallback
+  // template opener so onboarding never blocks on Apify.
+  const audit = await runProfileAudit({
+    userId: user.id,
+    handle: tiktok_handle,
+    niche,
+    ninetyDayGoal: ninety_day_goal,
+    limit: 10,
+  });
 
   const now = new Date().toISOString();
   await admin.from("conversations").insert({
     user_id: user.id,
     channel: "web",
-    title: "Welcome",
+    title: audit.ok ? "Profile audit" : "Welcome",
     messages: [
       {
         role: "assistant",
-        content: opener,
+        content: audit.opener,
         created_at: now,
       },
     ],

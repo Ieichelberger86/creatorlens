@@ -119,3 +119,33 @@ export async function scrapeTikTokPost(
   const dataset = await client.dataset(run.defaultDatasetId).listItems({ limit: 1 });
   return (dataset.items[0] as TikTokPost | undefined) ?? null;
 }
+
+/**
+ * Scrape the most recent N posts from a creator's TikTok profile.
+ * Used during onboarding for the initial profile audit.
+ */
+export async function scrapeTikTokProfile(
+  handle: string,
+  limit = 10
+): Promise<TikTokPost[]> {
+  const client = apify();
+  if (!client) throw new Error("APIFY_TOKEN not configured");
+
+  const cleanHandle = handle.trim().replace(/^@+/, "").toLowerCase();
+  const n = Math.min(Math.max(limit, 1), 30);
+
+  const run = await client.actor(TIKTOK_SCRAPER).call(
+    {
+      profiles: [cleanHandle],
+      resultsPerPage: n,
+      shouldDownloadVideos: false,
+      shouldDownloadCovers: false,
+      shouldDownloadSubtitles: true,
+      proxyConfiguration: { useApifyProxy: true },
+    },
+    { timeout: 180, waitSecs: 180 }
+  );
+
+  const dataset = await client.dataset(run.defaultDatasetId).listItems({ limit: n });
+  return (dataset.items as TikTokPost[]) ?? [];
+}
