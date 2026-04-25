@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { SettingsForm, type SettingsInitial } from "./settings-form";
+import { PageShell } from "../page-shell";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -50,18 +51,13 @@ export default async function SettingsPage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
-      <div className="mb-6 flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">
-          Settings
-        </h1>
-        <p className="text-sm text-fg-muted">
-          Update what Lens knows about you. Changes apply to the next message
-          and any new tool runs.
-        </p>
-      </div>
-
+    <PageShell
+      routeLabel="/app/settings"
+      title="Settings"
+      subtitle="Update what Lens knows about you. Changes apply to the next message and any new tool runs."
+      width="narrow"
+    >
       <SettingsForm initial={initial} />
-    </main>
+    </PageShell>
   );
 }

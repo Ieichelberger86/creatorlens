@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { GoalsClient, type GoalRow } from "./goals-client";
+import { PageShell } from "../page-shell";
 
 export const metadata: Metadata = {
   title: "Goals",
@@ -27,18 +28,11 @@ export default async function GoalsPage() {
     .limit(50);
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
-      <div className="mb-6 flex flex-col gap-1">
-        <div className="font-mono text-xs text-fg-subtle">/app/goals</div>
-        <h1 className="font-display text-2xl font-bold tracking-tight">
-          Your 90-day goals
-        </h1>
-        <p className="text-sm text-fg-muted">
-          Set during onboarding from your audit + 90-day vision. Lens uses these
-          to bias every recommendation. Update progress as you go.
-        </p>
-      </div>
-
+    <PageShell
+      routeLabel="/app/goals"
+      title="Your 90-day goals"
+      subtitle="Set during onboarding from your audit + 90-day vision. Lens uses these to bias every recommendation."
+    >
       {error ? (
         <div className="mb-6 rounded-lg border border-danger/40 bg-danger/5 p-4 text-sm text-danger">
           DB error: {error.message}
@@ -46,6 +40,6 @@ export default async function GoalsPage() {
       ) : null}
 
       <GoalsClient rows={(data ?? []) as GoalRow[]} />
-    </main>
+    </PageShell>
   );
 }

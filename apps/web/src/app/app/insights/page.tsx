@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { PageShell } from "../page-shell";
 
 export const metadata: Metadata = {
   title: "Insights",
@@ -50,17 +51,12 @@ export default async function InsightsPage() {
   const stats = computeStats(rows);
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
-      <header className="mb-8">
-        <div className="font-mono text-xs text-fg-subtle">/app/insights</div>
-        <h1 className="font-display text-3xl font-bold tracking-tight">
-          Your numbers
-        </h1>
-        <p className="mt-1 text-sm text-fg-muted">
-          Built from {rows.length} of your videos. Lens references this on every reply.
-        </p>
-      </header>
-
+    <PageShell
+      routeLabel="/app/insights"
+      title="Your numbers"
+      subtitle={`Built from ${rows.length} of your videos. Lens references this on every reply.`}
+      width="wide"
+    >
       {error ? (
         <div className="card mb-6 border-danger/40 bg-danger/5 text-danger">
           DB error: {error.message}
@@ -216,7 +212,7 @@ export default async function InsightsPage() {
           </section>
         </>
       )}
-    </main>
+    </PageShell>
   );
 }
 
