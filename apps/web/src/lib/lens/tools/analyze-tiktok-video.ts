@@ -1,101 +1,169 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { scrapeTikTokPost, fetchSubtitleText } from "../apify.js";
 
 export const analyzeTiktokVideoTool: Anthropic.Tool = {
   name: "analyze_tiktok_video",
   description:
-    "Record a TikTok video the creator (or a competitor) has posted. In alpha, the creator pastes the URL + transcript + any stats they have; this tool persists it and returns a structured summary you can reference. If transcript is missing, ask the creator to paste it manually.",
+    "Pull transcript, view/like/comment counts, hashtags, music, and author info for any TikTok video. Pass the URL and Lens auto-fetches everything via Apify, persists to the videos table, and returns a structured summary you can reference immediately. Use this whenever the creator pastes or mentions a TikTok URL — their own or a competitor's.",
   input_schema: {
     type: "object",
     properties: {
       url: {
         type: "string",
-        description: "The TikTok URL, e.g. https://www.tiktok.com/@handle/video/1234567890",
+        description: "Full TikTok video URL, e.g. https://www.tiktok.com/@handle/video/1234567890123",
       },
       is_own: {
         type: "boolean",
         description:
           "True if this is the creator's own video. False if it's a competitor or inspiration.",
       },
-      transcript: {
-        type: "string",
-        description:
-          "The spoken transcript, pasted by the creator. Leave empty if unknown.",
-      },
-      views: { type: "integer", description: "Total views if known." },
-      likes: { type: "integer", description: "Likes if known." },
-      comments_count: {
-        type: "integer",
-        description: "Number of comments if known.",
-      },
       notes: {
         type: "string",
         description:
-          "Free-form context from the creator (what they were trying, what they noticed, etc.).",
+          "Optional context from the creator (what they were trying, what they noticed, etc.).",
       },
     },
     required: ["url", "is_own"],
   },
 };
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
 export async function analyzeTiktokVideoExecutor(
   input: Record<string, unknown>,
   ctx: { userId: string }
 ): Promise<string> {
-  const {
-    url,
-    is_own,
-    transcript,
-    views,
-    likes,
-    comments_count,
-    notes,
-  } = input as {
+  const { url, is_own, notes } = input as {
     url: string;
     is_own: boolean;
-    transcript?: string;
-    views?: number;
-    likes?: number;
-    comments_count?: number;
     notes?: string;
   };
 
-  const performance: Record<string, unknown> = {};
-  if (typeof views === "number") performance.views = views;
-  if (typeof likes === "number") performance.likes = likes;
-  if (typeof comments_count === "number") performance.comments_count = comments_count;
-  if (notes) performance.notes = notes;
-
-  const db = supabaseAdmin();
-  const { data, error } = await db
-    .from("videos")
-    .upsert(
-      {
-        user_id: ctx.userId,
-        tiktok_url: url,
-        is_own: !!is_own,
-        transcript: transcript ?? null,
-        performance,
-        analyzed_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,tiktok_url" }
-    )
-    .select()
-    .single();
-
-  if (error) {
-    return `Could not save this video: ${error.message}`;
+  if (!/tiktok\.com\/.+\/video\/\d+/.test(url)) {
+    return "That URL doesn't look like a TikTok video link. Pass the full URL like https://www.tiktok.com/@handle/video/1234567890.";
   }
 
-  const lines = [
-    `Recorded video ${is_own ? "(own)" : "(competitor/inspiration)"} — ${url}`,
-    transcript
-      ? `Transcript captured (${transcript.length} chars).`
-      : "No transcript yet — ask the creator to paste it if needed.",
-    Object.keys(performance).length
-      ? `Performance: ${JSON.stringify(performance)}`
-      : "No performance data — ask for views/likes if relevant.",
-    `Row id: ${data?.id ?? "?"}`,
-  ];
+  const db = supabaseAdmin();
+
+  // 24h cache: if we already analyzed this URL recently, return that
+  const { data: cached } = await db
+    .from("videos")
+    .select("id, transcript, performance, analyzed_at, is_own")
+    .eq("user_id", ctx.userId)
+    .eq("tiktok_url", url)
+    .maybeSingle();
+
+  if (cached?.analyzed_at) {
+    const age = Date.now() - new Date(cached.analyzed_at).getTime();
+    if (age < ONE_DAY_MS) {
+      return formatSummary({
+        url,
+        cached: true,
+        is_own: cached.is_own,
+        transcript: cached.transcript,
+        performance: cached.performance as Record<string, unknown>,
+      });
+    }
+  }
+
+  // Live scrape
+  let post: Awaited<ReturnType<typeof scrapeTikTokPost>>;
+  try {
+    post = await scrapeTikTokPost(url);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `Couldn't reach the scraper (${msg}). Tell the creator you'll need them to paste the transcript + view/like counts manually for now.`;
+  }
+
+  if (!post) {
+    return `The scraper couldn't pull this video (it might be private, deleted, or region-locked). Ask the creator to paste the transcript and any stats they have.`;
+  }
+
+  // Pull a transcript if available
+  let transcript: string | null = post.text ?? null;
+  const subtitleEn = (post.videoMeta?.subtitleLinks ?? []).find(
+    (s) => (s.language ?? "").toLowerCase().startsWith("en")
+  );
+  if (subtitleEn?.downloadLink) {
+    const fetched = await fetchSubtitleText(subtitleEn.downloadLink);
+    if (fetched) transcript = fetched;
+  }
+
+  const performance: Record<string, unknown> = {
+    views: post.playCount ?? null,
+    likes: post.diggCount ?? null,
+    comments: post.commentCount ?? null,
+    shares: post.shareCount ?? null,
+    saves: post.collectCount ?? null,
+    duration_sec: post.videoMeta?.duration ?? null,
+    posted_at: post.createTimeISO ?? null,
+    author: post.authorMeta?.name ?? null,
+    music: post.musicMeta?.musicName ?? null,
+    hashtags: (post.hashtags ?? []).map((h) => h.name).filter(Boolean),
+    caption: post.text ?? null,
+  };
+  if (notes) performance.notes = notes;
+
+  // Upsert into videos table
+  await db.from("videos").upsert(
+    {
+      user_id: ctx.userId,
+      tiktok_url: url,
+      tiktok_id: post.id ?? null,
+      is_own: !!is_own,
+      transcript,
+      performance,
+      analyzed_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,tiktok_url" }
+  );
+
+  return formatSummary({
+    url,
+    cached: false,
+    is_own: !!is_own,
+    transcript,
+    performance,
+  });
+}
+
+function formatSummary(args: {
+  url: string;
+  cached: boolean;
+  is_own: boolean;
+  transcript: string | null;
+  performance: Record<string, unknown>;
+}): string {
+  const { url, cached, is_own, transcript, performance } = args;
+  const v = (k: string) => performance[k];
+  const fmt = (n: unknown) =>
+    typeof n === "number" ? n.toLocaleString() : "?";
+
+  const lines: string[] = [];
+  lines.push(`Video: ${url}`);
+  lines.push(`Source: ${is_own ? "creator's own" : "competitor / inspiration"}${cached ? " (cached, <24h old)" : ""}`);
+  if (v("author")) lines.push(`Author: @${v("author")}`);
+  if (v("posted_at")) lines.push(`Posted: ${v("posted_at")}`);
+  if (typeof v("duration_sec") === "number") lines.push(`Duration: ${v("duration_sec")}s`);
+  lines.push("");
+  lines.push("Performance:");
+  lines.push(`  views=${fmt(v("views"))} likes=${fmt(v("likes"))} comments=${fmt(v("comments"))} shares=${fmt(v("shares"))} saves=${fmt(v("saves"))}`);
+  const tags = v("hashtags");
+  if (Array.isArray(tags) && tags.length) {
+    lines.push(`  hashtags: ${tags.map((t) => `#${t}`).join(" ")}`);
+  }
+  if (v("music")) lines.push(`  music: ${v("music")}`);
+  lines.push("");
+  if (v("caption")) {
+    lines.push(`Caption: ${String(v("caption")).slice(0, 300)}`);
+    lines.push("");
+  }
+  lines.push("Transcript:");
+  if (transcript) {
+    lines.push(transcript.length > 2400 ? transcript.slice(0, 2400) + "…" : transcript);
+  } else {
+    lines.push("(no transcript available — video has no captions or audio is silent)");
+  }
   return lines.join("\n");
 }
