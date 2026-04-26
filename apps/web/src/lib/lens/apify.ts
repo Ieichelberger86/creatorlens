@@ -270,13 +270,19 @@ export async function scrapeTikTokPost(
   return post;
 }
 
-/** Last N posts on a profile. */
+/** Last N posts on a profile. Cap is 200 — enough to cover most creators'
+ * full TikTok history while staying under Apify's per-run limits. */
 export async function scrapeTikTokProfile(
   handle: string,
-  limit = 10
+  limit = 100
 ): Promise<TikTokPost[]> {
   const cleanHandle = handle.trim().replace(/^@+/, "").toLowerCase();
-  const n = Math.min(Math.max(limit, 1), 30);
+  const n = Math.min(Math.max(limit, 1), 200);
+
+  // Subtitles add ~3s per video to the scrape — only download them for
+  // smaller pulls (audit usually runs at 100, but only the top-N
+  // transcripts get sent to Claude — see audit.ts).
+  const downloadSubtitles = n <= 30;
 
   const { items } = await runActorSync<TikTokPost>(
     TIKTOK_SCRAPER,
@@ -285,10 +291,11 @@ export async function scrapeTikTokProfile(
       resultsPerPage: n,
       shouldDownloadVideos: false,
       shouldDownloadCovers: false,
-      shouldDownloadSubtitles: true,
+      shouldDownloadSubtitles: downloadSubtitles,
       proxyConfiguration: { useApifyProxy: true },
     },
-    180,
+    // Allow up to 5 minutes for big profiles
+    300,
     n
   );
   return items;

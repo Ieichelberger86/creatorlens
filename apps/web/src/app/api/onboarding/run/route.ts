@@ -174,7 +174,10 @@ export async function POST(req: NextRequest) {
 
         await admin
           .from("creator_profile")
-          .update({ onboarded_at: new Date().toISOString() })
+          .update({
+            onboarded_at: new Date().toISOString(),
+            last_audited_at: new Date().toISOString(),
+          })
           .eq("user_id", user.id);
 
         send({

@@ -154,6 +154,15 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
         },
         keywords: "blank fresh",
       },
+      {
+        id: "rerun-audit",
+        label: "Run a fresh audit",
+        hint: "full profile, ~2 minutes",
+        icon: "🔁",
+        group: "ask",
+        run: () => router.push("/app/audit/running" as Route),
+        keywords: "audit refresh redo update",
+      },
 
       // Account
       {

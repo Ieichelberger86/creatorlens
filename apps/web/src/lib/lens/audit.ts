@@ -22,11 +22,19 @@ type AuditResult = {
 };
 
 /**
- * Run an initial profile audit during onboarding.
+ * Run a full-profile audit. Scrapes up to 100 videos by default (cap 200),
+ * computes lifetime stats from the entire pull, then sends a curated subset
+ * (top performers + most recent + median examples) to Claude so the audit
+ * is grounded in the creator's real history without ballooning the prompt.
+ *
  *  1. Scrape last N videos from the creator's TikTok profile via Apify
- *  2. Persist each video into public.videos
- *  3. Persist a top_videos summary into public.creator_profile
- *  4. Ask Claude to write a personalized opener that references real numbers
+ *  2. Persist each into public.videos
+ *  3. Compute account-wide stats (median, avg, top, hashtags, posting cadence,
+ *     engagement rates) from the FULL set
+ *  4. Pull transcripts for the top ~10 (the ones Claude will actually see)
+ *  5. Pick a representative subset for the audit prompt
+ *  6. Ask Claude to write the structured audit
+ *
  * If anything fails, returns a friendly fallback opener so onboarding never
  * blocks on a flaky scraper.
  */
@@ -40,7 +48,8 @@ export async function runProfileAudit(args: {
 }): Promise<AuditResult> {
   const { userId, handle, niche, ninetyDayGoal } = args;
   const monetizationStreams = args.monetizationStreams ?? [];
-  const limit = args.limit ?? 10;
+  // Default: 100 videos. Apify caps at 200. Most creators have <100 posts.
+  const limit = args.limit ?? 100;
   const cleanHandle = handle.replace(/^@+/, "").toLowerCase();
 
   let posts: TikTokPost[] = [];
@@ -51,9 +60,14 @@ export async function runProfileAudit(args: {
     scrapeErr = err instanceof Error ? err.message : String(err);
   }
 
-  // Resolve transcripts for each video in parallel (best-effort)
+  // Pick a curated subset to fetch transcripts for — Apify only auto-
+  // downloads subtitles when limit ≤ 30, so for big pulls we fetch
+  // transcripts in a second pass for just the videos Claude will actually
+  // see (top performers + most recent + median examples).
+  const transcriptTargets = pickAuditSubset(posts);
+
   await Promise.all(
-    posts.map(async (p) => {
+    transcriptTargets.map(async (p) => {
       const en = (p.videoMeta?.subtitleLinks ?? []).find((s) =>
         (s.language ?? "").toLowerCase().startsWith("en")
       );
@@ -238,8 +252,10 @@ No preamble. No explanation. Just those two sections.`,
     };
   }
 
-  // Compute extra signals for the audit report
-  const compactPosts = posts.slice(0, limit).map((p, i) => ({
+  // Compute extra signals for the audit report. Use the SAME curated subset
+  // we fetched transcripts for so Claude sees them annotated.
+  const subset = pickAuditSubset(posts);
+  const compactPosts = subset.map((p, i) => ({
     n: i + 1,
     url: p.webVideoUrl,
     posted_at: p.createTimeISO,
@@ -440,4 +456,70 @@ function defaultOpener(args: {
 Let's open with a content audit. Paste me 1–3 of your best recent videos — TikTok links or just the hooks if that's faster — and I'll pull the patterns we can lean into.
 
 If you'd rather start from scratch, just tell me the next video idea on your mind and we'll build the hook from there.`;
+}
+
+/**
+ * From a 100-video pull, pick the ~16 videos that will be sent to Claude.
+ *
+ * Heuristic: top performers tell us what works, recent posts tell us what
+ * the creator is doing now, median examples tell us their baseline.
+ *
+ * - Top 8 by view count
+ * - Most recent 5 (deduped against top 8)
+ * - Up to 3 median-y examples (videos near the median view count, deduped)
+ *
+ * Returns ≤16 unique posts — all the ones Claude will see annotated. The
+ * full ~100 set still drives the lifetime stats (median, hashtag agg,
+ * cadence, engagement rates) so the audit is grounded in everything
+ * without flooding the prompt.
+ */
+export function pickAuditSubset(posts: TikTokPost[]): TikTokPost[] {
+  if (posts.length === 0) return [];
+  const seen = new Set<string>();
+  const result: TikTokPost[] = [];
+  const add = (p: TikTokPost) => {
+    const id = p.webVideoUrl ?? p.id ?? "";
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    result.push(p);
+  };
+
+  // Top 8 by play count
+  [...posts]
+    .filter((p) => typeof p.playCount === "number")
+    .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
+    .slice(0, 8)
+    .forEach(add);
+
+  // Most recent 5
+  [...posts]
+    .filter((p) => p.createTimeISO)
+    .sort(
+      (a, b) =>
+        Date.parse(b.createTimeISO ?? "") - Date.parse(a.createTimeISO ?? "")
+    )
+    .slice(0, 5)
+    .forEach(add);
+
+  // 3 median-y examples — videos closest to median view count
+  const views = posts
+    .map((p) => p.playCount ?? 0)
+    .filter((v) => v > 0)
+    .sort((a, b) => a - b);
+  const median = views.length
+    ? views[Math.floor(views.length / 2)] ?? 0
+    : 0;
+  if (median > 0) {
+    [...posts]
+      .filter((p) => typeof p.playCount === "number" && p.playCount! > 0)
+      .sort(
+        (a, b) =>
+          Math.abs((a.playCount ?? 0) - median) -
+          Math.abs((b.playCount ?? 0) - median)
+      )
+      .slice(0, 3)
+      .forEach(add);
+  }
+
+  return result;
 }
