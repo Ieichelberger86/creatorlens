@@ -1,13 +1,8 @@
 export const PRICING = {
   founding: {
-    name: "CreatorLens Founding Member",
-    monthlyCents: 2900, // $29/mo locked forever
+    name: "CreatorLens",
+    monthlyCents: 2900, // $29/mo — single tier, all creators
     spots: 500,
-    tokenBudgetMonthly: 500_000,
-  },
-  standard: {
-    name: "CreatorLens Standard",
-    monthlyCents: 4900, // $49/mo — set higher later; placeholder
     tokenBudgetMonthly: 500_000,
   },
   preorder: {

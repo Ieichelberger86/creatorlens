@@ -1,7 +1,7 @@
 // Hand-written types matching schema.sql. Once a Supabase project exists, run
 // `pnpm --filter @creatorlens/db gen:types` to regenerate a stricter version.
 
-export type UserTier = "preorder" | "founding" | "standard" | "vanguard" | "admin";
+export type UserTier = "preorder" | "founding" | "vanguard" | "admin";
 
 export type ContainerStatus =
   | "provisioning"

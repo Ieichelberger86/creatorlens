@@ -29,7 +29,7 @@ export type AgencyRow = {
   live_shows_30d: number;
 };
 
-const TIERS = ["preorder", "founding", "standard", "vanguard", "admin"];
+const TIERS = ["preorder", "founding", "vanguard", "admin"];
 
 export function AgencyClient({ rows }: { rows: AgencyRow[] }) {
   const [filter, setFilter] = useState<"all" | "active" | "stale" | "stuck" | "preorder">(

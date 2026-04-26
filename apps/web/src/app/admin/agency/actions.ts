@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-const TIERS = ["preorder", "founding", "standard", "vanguard", "admin"] as const;
+const TIERS = ["preorder", "founding", "vanguard", "admin"] as const;
 
 export async function sendNudge(userId: string, message: string) {
   if (!userId || !message || message.length < 4) {

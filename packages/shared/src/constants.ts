@@ -24,7 +24,6 @@ export const CHANNELS = ["web", "telegram", "discord"] as const;
 export const TIERS = [
   "preorder",
   "founding",
-  "standard",
   "vanguard",
   "admin",
 ] as const;
