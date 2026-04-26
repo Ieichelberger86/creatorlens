@@ -8,6 +8,7 @@ import {
   rescheduleEntry,
   updateCalendarStatus,
 } from "./actions";
+import { StartChatButton } from "../start-chat-button";
 
 export type CalendarRow = {
   id: string;
@@ -242,9 +243,10 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         rows manually below.
       </p>
       <div className="flex flex-wrap justify-center gap-2">
-        <a href="/app" className="btn-primary text-sm">
-          Ask Lens for 5 ideas
-        </a>
+        <StartChatButton
+          prompt="Brainstorm 5 video ideas for me this week. Use my niche + voice samples + recent winners. Then offer to schedule the strongest 3."
+          label="Ask Lens for 5 ideas"
+        />
         <button onClick={onCreate} className="btn-secondary text-sm">
           + Add manually
         </button>

@@ -1,13 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
+import { createNewConversation } from "./conversations/actions";
 
-const NAV: Array<{ href: Route; label: string; icon: string; match: (p: string) => boolean }> = [
+type Item = {
+  href: Route;
+  label: string;
+  icon: string;
+  match: (p: string) => boolean;
+};
+
+const TABS: Item[] = [
   { href: "/app" as Route, label: "Home", icon: "🏠", match: (p) => p === "/app" },
-  { href: "/app/chat" as Route, label: "Chat", icon: "💬", match: (p) => p === "/app/chat" || p.startsWith("/app/c/") },
+  {
+    href: "/app/chat" as Route,
+    label: "Chat",
+    icon: "💬",
+    match: (p) => p === "/app/chat" || p.startsWith("/app/c/"),
+  },
+];
+
+const MORE: Item[] = [
   { href: "/app/goals" as Route, label: "Goals", icon: "🎯", match: (p) => p.startsWith("/app/goals") },
   { href: "/app/calendar" as Route, label: "Calendar", icon: "📅", match: (p) => p.startsWith("/app/calendar") },
   { href: "/app/brand-deals" as Route, label: "Brand deals", icon: "🤝", match: (p) => p.startsWith("/app/brand-deals") },
@@ -16,27 +32,62 @@ const NAV: Array<{ href: Route; label: string; icon: string; match: (p: string) 
 ];
 
 export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
-  const [open, setOpen] = useState(false);
   const path = usePathname() ?? "/app";
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+
+  // Hide the bottom tab bar inside the chat (it overlaps the composer)
+  const hidden = path.startsWith("/app/c/");
+
+  if (hidden) return null;
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-bg-elevated text-fg-muted hover:text-fg sm:hidden"
-        aria-label="Open menu"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 16 16"
-          fill="currentColor"
-          className="h-4 w-4"
-        >
-          <path d="M2.75 4a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9A.75.75 0 0 1 2.75 4Zm0 4a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9A.75.75 0 0 1 2.75 8Zm0 4a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9a.75.75 0 0 1-.75-.75Z" />
-        </svg>
-      </button>
+      {/* Bottom tab bar — fixed at the bottom on mobile */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around border-t border-border bg-bg-elevated/95 backdrop-blur sm:hidden">
+        {TABS.map((tab) => {
+          const active = tab.match(path);
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={
+                "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] transition " +
+                (active ? "text-accent" : "text-fg-muted hover:text-fg")
+              }
+            >
+              <span className="text-lg leading-none">{tab.icon}</span>
+              <span>{tab.label}</span>
+            </Link>
+          );
+        })}
 
+        {/* New chat button — wide center pill */}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => start(async () => void (await createNewConversation()))}
+          className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] text-accent transition hover:text-fg disabled:opacity-50"
+        >
+          <span className="text-lg leading-none">➕</span>
+          <span>New chat</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={
+            "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] transition " +
+            (MORE.some((m) => m.match(path)) ? "text-accent" : "text-fg-muted hover:text-fg")
+          }
+          aria-label="More"
+        >
+          <span className="text-lg leading-none">⋯</span>
+          <span>More</span>
+        </button>
+      </nav>
+
+      {/* Bottom-up sheet for "More" */}
       {open ? (
         <>
           <div
@@ -44,14 +95,11 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40 bg-black/60 sm:hidden"
           />
-          <aside className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col gap-1 border-r border-border bg-bg-elevated p-3 sm:hidden">
-            <div className="mb-3 flex items-center justify-between px-2 py-1">
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-5 rounded-md bg-accent" />
-                <span className="font-display text-sm font-semibold tracking-tight">
-                  CreatorLens
-                </span>
-              </div>
+          <aside className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col gap-1 rounded-t-2xl border-t border-border bg-bg-elevated p-3 pb-6 sm:hidden">
+            <div className="mb-2 flex items-center justify-between px-2 py-1">
+              <span className="font-display text-sm font-semibold tracking-tight">
+                More
+              </span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -62,7 +110,7 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
               </button>
             </div>
 
-            {NAV.map((item) => {
+            {MORE.map((item) => {
               const active = item.match(path);
               return (
                 <Link
@@ -70,7 +118,7 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
                   href={item.href}
                   onClick={() => setOpen(false)}
                   className={
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition " +
+                    "flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition " +
                     (active
                       ? "bg-accent/15 text-fg"
                       : "text-fg-muted hover:bg-bg hover:text-fg")
@@ -87,30 +135,31 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
                 href={"/admin/agency" as Route}
                 onClick={() => setOpen(false)}
                 className={
-                  "mt-1 flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-sm transition " +
+                  "mt-1 flex items-center gap-3 rounded-lg border border-border px-3 py-3 text-sm transition " +
                   (path.startsWith("/admin")
                     ? "border-accent/40 bg-accent/10 text-accent"
                     : "text-fg-muted hover:border-accent/40 hover:text-fg")
                 }
               >
                 <span className="text-base">🛠️</span>
-                <span>Agency control</span>
+                <span>Agency</span>
               </Link>
             ) : null}
 
-            <div className="mt-auto border-t border-border pt-3">
-              <form action="/auth/sign-out" method="POST">
-                <button
-                  type="submit"
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-fg-muted transition hover:bg-bg hover:text-danger"
-                >
-                  ↩  Sign out
-                </button>
-              </form>
-            </div>
+            <form action="/auth/sign-out" method="POST" className="mt-2 border-t border-border pt-2">
+              <button
+                type="submit"
+                className="w-full rounded-lg px-3 py-3 text-left text-sm text-fg-muted transition hover:bg-bg hover:text-danger"
+              >
+                ↩  Sign out
+              </button>
+            </form>
           </aside>
         </>
       ) : null}
+
+      {/* Reserve space above the fixed tab bar so content isn't covered */}
+      <div className="h-16 sm:hidden" />
     </>
   );
 }

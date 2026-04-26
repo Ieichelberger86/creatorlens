@@ -8,6 +8,7 @@ import {
   updateBrandDealStatus,
   deleteBrandDeal,
 } from "./actions";
+import { StartChatButton } from "../start-chat-button";
 
 export type BrandDealRow = {
   id: string;
@@ -162,9 +163,11 @@ function EmptyState({ onSubmit }: { onSubmit: () => void }) {
         <button onClick={onSubmit} className="btn-primary text-sm">
           + Review a deal
         </button>
-        <a href="/app" className="btn-secondary text-sm">
-          Paste in chat instead
-        </a>
+        <StartChatButton
+          prompt="I'm going to paste a brand deal pitch in my next message — review it for scam patterns, extract the real terms (cash, deliverables, exclusivity, usage rights), and draft a recommended response in my voice."
+          label="Paste in chat instead"
+          variant="secondary"
+        />
       </div>
     </div>
   );

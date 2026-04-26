@@ -3,21 +3,22 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
+import { HeaderMoreMenu } from "./header-more-menu";
 
-const NAV: Array<{ href: Route; label: string; match: (p: string) => boolean }> = [
+const PRIMARY: Array<{ href: Route; label: string; match: (p: string) => boolean }> = [
   { href: "/app" as Route, label: "Home", match: (p) => p === "/app" },
-  { href: "/app/chat" as Route, label: "Chat", match: (p) => p === "/app/chat" || p.startsWith("/app/c/") },
-  { href: "/app/goals" as Route, label: "Goals", match: (p) => p.startsWith("/app/goals") },
-  { href: "/app/calendar" as Route, label: "Calendar", match: (p) => p.startsWith("/app/calendar") },
-  { href: "/app/brand-deals" as Route, label: "Brand deals", match: (p) => p.startsWith("/app/brand-deals") },
-  { href: "/app/insights" as Route, label: "Insights", match: (p) => p.startsWith("/app/insights") },
+  {
+    href: "/app/chat" as Route,
+    label: "Chat",
+    match: (p) => p === "/app/chat" || p.startsWith("/app/c/"),
+  },
 ];
 
 export function HeaderNav({ isAdmin }: { isAdmin: boolean }) {
   const path = usePathname() ?? "/app";
   return (
     <nav className="hidden items-center gap-1 text-sm sm:flex">
-      {NAV.map((item) => {
+      {PRIMARY.map((item) => {
         const active = item.match(path);
         return (
           <Link
@@ -34,19 +35,7 @@ export function HeaderNav({ isAdmin }: { isAdmin: boolean }) {
           </Link>
         );
       })}
-      {isAdmin ? (
-        <Link
-          href={"/admin/agency" as Route}
-          className={
-            "ml-2 rounded-md border border-border px-3 py-1.5 transition " +
-            (path.startsWith("/admin")
-              ? "bg-accent/10 text-accent border-accent/40"
-              : "text-fg-muted hover:border-accent/40 hover:text-fg")
-          }
-        >
-          Agency
-        </Link>
-      ) : null}
+      <HeaderMoreMenu isAdmin={isAdmin} />
     </nav>
   );
 }

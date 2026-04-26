@@ -8,6 +8,7 @@ import {
   recordGoalProgress,
   deleteGoal,
 } from "./actions";
+import { StartChatButton } from "../start-chat-button";
 
 export type GoalRow = {
   id: string;
@@ -78,11 +79,12 @@ export function GoalsClient({ rows }: { rows: GoalRow[] }) {
             <p className="mx-auto mb-5 max-w-md text-sm text-fg-muted">
               Lens sets goals automatically during onboarding from your audit
               + 90-day vision. If yours got skipped or you want to refocus,
-              ask in chat.
+              one click and we&apos;re on it.
             </p>
-            <a href="/app" className="btn-primary text-sm">
-              Tell Lens &ldquo;set my goals&rdquo;
-            </a>
+            <StartChatButton
+              prompt="Set my 90-day goals from my latest audit. Decompose them into 1-3 measurable goals with action plans."
+              label="Set my goals →"
+            />
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-bg-elevated/40 p-10 text-center text-fg-muted">

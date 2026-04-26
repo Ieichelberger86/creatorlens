@@ -93,7 +93,7 @@ export function SettingsForm({ initial: data }: { initial: SettingsInitial }) {
         />
       </Section>
 
-      <Section title="Monetization streams">
+      <Section title="How do you make money?">
         <fieldset className="text-sm text-fg-muted">
           <p className="mb-3 text-xs text-fg-subtle">
             Lens uses this on every recommendation — different streams need
