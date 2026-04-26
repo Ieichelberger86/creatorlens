@@ -29,6 +29,7 @@ type VideoPlan = {
   description: string;
   hashtags: string[];
   why: string;
+  goal_id?: string | null; // which active goal this video serves
 };
 
 type WeeklyReviewPayload = {
@@ -98,7 +99,12 @@ const REVIEW_TOOL: Anthropic.Tool = {
             },
             why: {
               type: "string",
-              description: "1-sentence reasoning tied to the audit / last week's data.",
+              description: "1-sentence reasoning tied to the audit / last week's data + which goal this video serves.",
+            },
+            goal_id: {
+              type: "string",
+              description:
+                "The id (8-char prefix is fine) of the active goal this video directly serves. Required if there are active goals. Leave empty only if no active goals exist.",
             },
           },
           required: [
@@ -306,17 +312,109 @@ export async function generateWeeklyReview(args: {
     hashtags: (p.hashtags ?? []).map((h) => h.name).filter(Boolean),
   }));
 
-  // Build the active-goals summary for the prompt
+  // Auto-derive new current values for each goal based on the freshest data.
+  // For followers/views/consistency we can compute it; for monetization/other
+  // we leave the existing manual value.
+  const followerCount =
+    (recentPosts[0]?.authorMeta?.fans as number | undefined) ?? null;
+
+  const lastWeekTotalViews = lastWeekVideos.reduce(
+    (s, p) => s + (p.playCount ?? 0),
+    0
+  );
+  const last30dPosts = recentPosts
+    .filter((p) => p.createTimeISO)
+    .filter(
+      (p) =>
+        Date.parse(p.createTimeISO ?? "") >= Date.now() - 30 * 86_400_000
+    );
+  const recentAvgViews = last30dPosts.length
+    ? Math.round(
+        last30dPosts.reduce((s, p) => s + (p.playCount ?? 0), 0) /
+          last30dPosts.length
+      )
+    : 0;
+  const postsLastWeek = lastWeekVideos.length;
+
+  // Pull last week's review (if any) to compute deltas
+  const { data: priorReview } = await db
+    .from("weekly_reviews")
+    .select("goal_progress")
+    .eq("user_id", userId)
+    .lt("week_starting", weekStarting)
+    .order("week_starting", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const priorProgressMap = new Map<string, number>();
+  if (priorReview?.goal_progress && Array.isArray(priorReview.goal_progress)) {
+    for (const p of priorReview.goal_progress as Array<{
+      goal_id: string;
+      current?: number | null;
+    }>) {
+      if (typeof p.current === "number") priorProgressMap.set(p.goal_id, p.current);
+    }
+  }
+
+  // Compute newCurrent per goal kind
+  const goalUpdates: Array<{
+    id: string;
+    newCurrent: number | null;
+    delta: number | null;
+  }> = [];
+  for (const g of goals ?? []) {
+    const id = g.id as string;
+    const kind = g.kind as string;
+    const existingCurrent = (g.current_value as number | null) ?? null;
+    let newCurrent: number | null = existingCurrent;
+
+    if (kind === "followers" && followerCount !== null) {
+      newCurrent = followerCount;
+    } else if (kind === "views") {
+      // Two interpretations: weekly view count target vs. avg-views target.
+      // Heuristic: if baseline≈avg_views range, treat as avg target; else cumulative.
+      const baseline = (g.baseline_value as number | null) ?? 0;
+      if (baseline > 0 && baseline < 1_000_000) {
+        // Looks like an avg-views target
+        newCurrent = recentAvgViews;
+      } else {
+        // Cumulative: bump by last week's total
+        newCurrent = (existingCurrent ?? baseline ?? 0) + lastWeekTotalViews;
+      }
+    } else if (kind === "consistency") {
+      newCurrent = postsLastWeek;
+    }
+    // engagement / monetization / audience_quality / other → leave manual
+
+    const prior = priorProgressMap.get(id) ?? existingCurrent ?? null;
+    const delta =
+      newCurrent !== null && prior !== null ? newCurrent - prior : null;
+
+    goalUpdates.push({ id, newCurrent, delta });
+
+    if (newCurrent !== null && newCurrent !== existingCurrent) {
+      await db
+        .from("goals")
+        .update({
+          current_value: newCurrent,
+          current_updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+    }
+  }
+
+  // Build the active-goals summary for the prompt — uses NEW current values
   const goalsForPrompt = (goals ?? []).map((g) => {
+    const id = g.id as string;
     const baseline = (g.baseline_value as number | null) ?? null;
-    const current = (g.current_value as number | null) ?? null;
+    const update = goalUpdates.find((u) => u.id === id);
+    const current = update?.newCurrent ?? (g.current_value as number | null) ?? null;
     const target = (g.target_value as number | null) ?? null;
     const pct =
       baseline !== null && target !== null && current !== null && target !== baseline
         ? +((((current - baseline) / (target - baseline)) * 100).toFixed(1))
         : null;
     return {
-      id: g.id as string,
+      id,
       title: g.title as string,
       kind: g.kind as string,
       baseline,
@@ -325,6 +423,7 @@ export async function generateWeeklyReview(args: {
       target_unit: g.target_unit as string | null,
       target_date: g.target_date as string | null,
       pct,
+      delta_this_week: update?.delta ?? null,
     };
   });
 
@@ -337,19 +436,28 @@ export async function generateWeeklyReview(args: {
     tool_choice: { type: "tool", name: "save_weekly_review" },
     system: `You're Lens running a structured weekly review for a TikTok creator.
 
-You replace the always-on chat. Once a week you produce a complete package
-the creator can act on for the next 7 days:
+You produce a complete package every Monday the creator can act on for
+the next 7 days:
 
 1. Review of last week's posted videos vs their baseline + goals
 2. Strategic narrative for this week (the "why")
-3. 5-7 specific video ideas — each ready-to-post with hook, description, hashtags, format, target day
+3. 5-7 specific video ideas — each ready-to-post AND directly serving a goal
 4. One biggest-leverage move
 
-Constraints:
-- Cite real numbers throughout — view counts, multipliers vs median, goal pct.
-- Hooks must be in the creator's voice (use the samples below). Max 14 words each.
+Goal coupling (the most important constraint):
+- Every video idea you generate MUST directly serve one of the active goals.
+  Tag each with the goal_id field.
+- The strategic narrative (this_week_plan) must explicitly tie the week's
+  bets to specific goals — "this week we attack Goal A by …".
+- goal_progress array must include EVERY active goal with the latest
+  values from the user message + the delta_this_week we computed.
+
+Output constraints:
+- Cite real numbers throughout — view counts, multipliers vs median, goal pct,
+  delta gained this week.
+- Hooks must be in the creator's voice (use the samples below). Max 14 words.
 - Descriptions are TikTok captions: 80-180 chars, hook-driven, no "follow for more" fluff.
-- Hashtag sets are 4-8 tags mixing big-volume + niche + specific topic. Lowercase, no # symbol in the array values.
+- Hashtag sets are 4-8 tags mixing big-volume + niche + specific topic. Lowercase, no # symbol.
 - target_day_offset: 0=Mon, 6=Sun of THIS upcoming week. Spread the videos across days.
 - Format options: talking-to-camera / stitch / b-roll / live / other.
 - "biggest_leverage_move": ONE sentence picking the single highest-impact move. NOT a list.
@@ -370,13 +478,26 @@ WEEK-OVER-WEEK BASELINE:
 - Median views (last 100 videos): ${medianViews}
 - Avg views: ${avgViews}
 
-ACTIVE GOALS:
+CURRENT FOLLOWERS: ${followerCount ?? "(unknown)"}
+LAST WEEK TOTAL VIEWS: ${lastWeekTotalViews}
+RECENT AVG VIEWS (last 30d): ${recentAvgViews}
+POSTS LAST WEEK: ${postsLastWeek}
+
+ACTIVE GOALS (current values are AUTO-UPDATED before this prompt — use these
+exact numbers in the goal_progress array, computing delta_this_week as the
+delta from the prior week's review):
 ${
   goalsForPrompt.length === 0
-    ? "(no active goals — leave goal_progress as an empty array)"
-    : goalsForPrompt.map((g) =>
-        `- [${g.id.slice(0, 8)}] ${g.title}: ${g.current ?? "?"} / ${g.target ?? "?"} ${g.target_unit ?? ""} (${g.pct === null ? "?" : g.pct + "%"} · target ${g.target_date ?? "?"})`
-      ).join("\n")
+    ? "(no active goals — leave goal_progress as an empty array, leave goal_id empty on videos)"
+    : goalsForPrompt
+        .map(
+          (g) =>
+            `- [id=${g.id}] ${g.title}
+  baseline=${g.baseline ?? "?"}, current=${g.current ?? "?"}, target=${g.target ?? "?"} ${g.target_unit ?? ""}
+  pct=${g.pct === null ? "?" : g.pct + "%"} · delta this week=${g.delta_this_week === null ? "?" : g.delta_this_week > 0 ? "+" + g.delta_this_week : g.delta_this_week} · target_date=${g.target_date ?? "?"}
+  kind=${g.kind}`
+        )
+        .join("\n")
 }
 
 LAST 7 DAYS — ${lastWeekVideos.length} VIDEOS POSTED:
@@ -408,10 +529,17 @@ Now generate the weekly review. Use save_weekly_review.`,
 
   const payload = toolUse.input as WeeklyReviewPayload;
 
+  // Build a goal_id → title lookup for the renderer (so each video card
+  // shows which goal it serves)
+  const goalLookup = new Map<string, string>();
+  for (const g of goals ?? []) {
+    goalLookup.set(g.id as string, g.title as string);
+  }
+
   // Compose the markdown plan from the structured videos so the human-
   // readable view (dashboard + /app/review/[id]) gets the per-video
   // hook/desc/hashtags inline.
-  const renderedPlan = renderPlan(payload, monday);
+  const renderedPlan = renderPlan(payload, monday, goalLookup);
 
   // Persist (upsert on user+week so re-runs replace)
   const { data: saved, error: saveErr } = await db
@@ -460,13 +588,27 @@ Now generate the weekly review. Use save_weekly_review.`,
       const dayOffset = Math.max(0, Math.min(6, v.target_day_offset));
       const targetDay = new Date(monday);
       targetDay.setUTCDate(monday.getUTCDate() + dayOffset);
-      // Default post time: 6pm UTC (loose default; creator picks the real time)
       targetDay.setUTCHours(18, 0, 0, 0);
+      // Resolve full goal id from prefix if Claude returned a short id
+      let resolvedGoalId: string | null = null;
+      if (v.goal_id) {
+        if (goalLookup.has(v.goal_id)) {
+          resolvedGoalId = v.goal_id;
+        } else {
+          for (const id of goalLookup.keys()) {
+            if (id.startsWith(v.goal_id) || v.goal_id.startsWith(id.slice(0, 8))) {
+              resolvedGoalId = id;
+              break;
+            }
+          }
+        }
+      }
+      const goalLabel = resolvedGoalId ? goalLookup.get(resolvedGoalId) : null;
       return {
         user_id: userId,
         title: v.title.slice(0, 200),
         hook: v.hook.slice(0, 500),
-        notes: `**Description:** ${v.description}\n\n**Hashtags:** ${v.hashtags.map((h) => "#" + h).join(" ")}\n\n**Format:** ${v.format}\n\n**Why:** ${v.why}`,
+        notes: `**Description:** ${v.description}\n\n**Hashtags:** ${v.hashtags.map((h) => "#" + h).join(" ")}\n\n**Format:** ${v.format}\n\n${goalLabel ? `**Serves goal:** ${goalLabel}\n\n` : ""}**Why:** ${v.why}`,
         status: "idea" as const,
         scheduled_for: targetDay.toISOString(),
         metadata: {
@@ -474,6 +616,7 @@ Now generate the weekly review. Use save_weekly_review.`,
           format: v.format,
           hashtags: v.hashtags,
           description: v.description,
+          goal_id: resolvedGoalId,
         },
       };
     });
@@ -494,9 +637,14 @@ Now generate the weekly review. Use save_weekly_review.`,
 /**
  * Render the structured payload into the markdown blob shown on the
  * dashboard and review pages. Per-video hook, description, hashtags
- * appear as inline blocks the creator can copy-paste.
+ * appear as inline blocks the creator can copy-paste. Each video is
+ * tagged with the goal it serves.
  */
-function renderPlan(payload: WeeklyReviewPayload, monday: Date): string {
+function renderPlan(
+  payload: WeeklyReviewPayload,
+  monday: Date,
+  goalLookup: Map<string, string>
+): string {
   const dayName = (offset: number) => {
     const d = new Date(monday);
     d.setUTCDate(monday.getUTCDate() + offset);
@@ -508,11 +656,30 @@ function renderPlan(payload: WeeklyReviewPayload, monday: Date): string {
     .map((v, i) => {
       const day = dayName(v.target_day_offset);
       const tagLine = v.hashtags.map((h) => "#" + h).join(" ");
+      // Resolve goal title from id (handles 8-char prefix matches too)
+      let goalLabel = "";
+      if (v.goal_id) {
+        const fullMatch = goalLookup.get(v.goal_id);
+        if (fullMatch) {
+          goalLabel = fullMatch;
+        } else {
+          // 8-char prefix match
+          for (const [id, title] of goalLookup) {
+            if (id.startsWith(v.goal_id) || v.goal_id.startsWith(id.slice(0, 8))) {
+              goalLabel = title;
+              break;
+            }
+          }
+        }
+      }
+      const goalLine = goalLabel
+        ? `**Serves goal:** ${goalLabel}\n\n`
+        : "";
       return `### ${i + 1}. ${v.title}
 
 **${day} · ${v.format}**
 
-> ${v.hook}
+${goalLine}> ${v.hook}
 
 **Caption:** ${v.description}
 

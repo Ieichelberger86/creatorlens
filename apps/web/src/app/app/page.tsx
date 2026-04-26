@@ -278,6 +278,19 @@ function GoalCard({ g }: { g: GoalProgress }) {
   const current = g.current ?? null;
   const target = g.target ?? null;
   const pct = g.pct ?? null;
+  const delta = g.delta_this_week ?? null;
+
+  // Compute "pct of target gained this week" — nice to surface progress
+  // velocity (e.g. "+0.8% toward goal" instead of just raw "+200")
+  const totalGap =
+    baseline !== null && target !== null && target !== baseline
+      ? target - baseline
+      : null;
+  const deltaPctOfTarget =
+    delta !== null && totalGap !== null && totalGap !== 0
+      ? +((delta / totalGap) * 100).toFixed(1)
+      : null;
+
   return (
     <div className="rounded-xl border border-border bg-bg-elevated/40 p-4">
       <h3 className="text-sm font-semibold leading-tight">{g.title}</h3>
@@ -304,20 +317,26 @@ function GoalCard({ g }: { g: GoalProgress }) {
           {baseline ?? "?"} → {target ?? "?"} (progress not measured yet)
         </div>
       )}
-      {g.delta_this_week !== null && g.delta_this_week !== undefined ? (
-        <div className="mt-2 text-[11px] text-fg-muted">
-          Δ this week:{" "}
+      {delta !== null ? (
+        <div className="mt-2 flex items-center gap-2 text-[11px]">
+          <span className="text-fg-subtle">This week:</span>
           <span
             className={
-              g.delta_this_week > 0
-                ? "text-success"
-                : g.delta_this_week < 0
-                  ? "text-danger"
+              delta > 0
+                ? "font-semibold text-success"
+                : delta < 0
+                  ? "font-semibold text-danger"
                   : "text-fg-muted"
             }
           >
-            {g.delta_this_week > 0 ? "+" : ""}
-            {g.delta_this_week}
+            {delta > 0 ? "+" : ""}
+            {delta.toLocaleString()}
+            {deltaPctOfTarget !== null && Math.abs(deltaPctOfTarget) >= 0.1 ? (
+              <span className="ml-1 font-normal text-fg-subtle">
+                ({deltaPctOfTarget > 0 ? "+" : ""}
+                {deltaPctOfTarget}% toward target)
+              </span>
+            ) : null}
           </span>
         </div>
       ) : null}
