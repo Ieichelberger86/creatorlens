@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabaseServer } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,20 +11,24 @@ const Body = z.object({
 });
 
 /**
- * Direct email login — no magic link wait. Trades email-ownership
- * verification for first-message friction.
+ * Direct email login — no magic link wait, no PKCE round-trip.
  *
- * Security model:
- * - Only emails already on the vanguard/admin allowlist are recognized.
- *   Random / unknown emails get the same generic 401 to avoid leaking
- *   account existence (timing-safe in spirit; we still skip the
- *   generateLink call when the user doesn't exist).
- * - The /demo route uses a separate allowlist-bypass for the seeded
- *   demo user.
+ * Earlier version redirected the browser through Supabase's
+ * /auth/v1/verify endpoint, which kicks back to /auth/callback?code=… for
+ * PKCE exchange. That fails because we never set a code_verifier cookie
+ * (PKCE requires the same client to start AND finish the flow). Result:
+ * "Couldn't verify the sign-in. Try again."
  *
- * Returns: { redirect: <Supabase auth verify URL> } that the client
- * follows via window.location.href. The verify URL sets the auth
- * cookie and routes to /auth/callback → /app.
+ * New approach: generate a magic-link token server-side, then call
+ * supabase.auth.verifyOtp({ token_hash, type: 'magiclink' }) on the
+ * server-bound client. That client writes the auth cookies directly to
+ * the response — no browser round-trip needed.
+ *
+ * Security model unchanged:
+ * - Only emails on the vanguard/admin allowlist authenticate.
+ * - Generic 401 on unknown emails (no enumeration).
+ * - /auth/callback tier-check still in place as a defense-in-depth
+ *   backup for any other auth path.
  */
 export async function POST(req: NextRequest) {
   let body: z.infer<typeof Body>;
@@ -39,7 +44,7 @@ export async function POST(req: NextRequest) {
   const email = body.email.trim().toLowerCase();
   const admin = supabaseAdmin();
 
-  // Allowlist gate: only existing vanguard/admin users can log in directly.
+  // Allowlist gate
   const { data: row } = await admin
     .from("users")
     .select("id, tier")
@@ -47,7 +52,6 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!row || (row.tier !== "vanguard" && row.tier !== "admin")) {
-    // Generic message — don't leak whether the email exists.
     return NextResponse.json(
       {
         error: "not_authorized",
@@ -58,29 +62,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Issue a magic link via the admin API and return its action_link.
-  // Client follows it via window.location.href, which routes through
-  // Supabase's /auth/v1/verify (sets cookie) → /auth/callback → /app.
-  const url = new URL(req.url);
-  const callback = `${url.origin}/auth/callback`;
-  const { data, error } = await admin.auth.admin.generateLink({
+  // Generate a magic-link token via the admin API
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: "magiclink",
     email,
-    options: { redirectTo: callback },
   });
 
-  if (error || !data?.properties?.action_link) {
+  if (linkError || !linkData?.properties?.hashed_token) {
     return NextResponse.json(
       {
         error: "link_failed",
-        message: error?.message ?? "Couldn't generate a sign-in link.",
+        message: linkError?.message ?? "Couldn't generate a sign-in token.",
       },
       { status: 500 }
     );
   }
 
-  return NextResponse.json({
-    ok: true,
-    redirect: data.properties.action_link,
+  // Verify the token on the server. This sets sb-* auth cookies directly
+  // on the response — no redirect through /auth/v1/verify, no PKCE.
+  const server = await supabaseServer();
+  const { error: verifyError } = await server.auth.verifyOtp({
+    token_hash: linkData.properties.hashed_token,
+    type: "magiclink",
   });
+
+  if (verifyError) {
+    return NextResponse.json(
+      {
+        error: "verify_failed",
+        message: verifyError.message,
+      },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ ok: true, redirect: "/app" });
 }

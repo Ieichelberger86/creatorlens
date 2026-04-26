@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { supabaseServer } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,42 +12,50 @@ const DEMO_EMAIL = "demo@creatorlens.app";
  *
  * Anyone hitting /demo gets logged in as the seeded demo user (vanguard
  * tier, 20K token cap, pre-populated profile + goals + calendar +
- * conversation). Generates a one-time magic link via the Supabase admin
- * API and follows it to set the auth cookie.
+ * conversation).
  *
- * Safety:
- * - Demo user can only see its own data (RLS enforces auth.uid() = user_id
- *   on every table).
- * - Token cap is set to 20K (vs 500K for real Vanguard users).
- * - Demo data can be re-seeded any time via `node --import tsx seed-demo.mts`.
+ * Implementation: same pattern as /api/auth/direct-login —
+ *   1. admin.generateLink mints a token server-side
+ *   2. server.auth.verifyOtp(token_hash) sets the auth cookies directly
+ *   3. redirect to /app
+ *
+ * No PKCE round-trip, no Supabase /auth/v1/verify redirect. The browser
+ * never sees the token.
  */
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const admin = supabaseAdmin();
 
-  // Generate a magic link for the demo user
-  const url = new URL(req.url);
-  const callbackUrl = `${url.origin}/auth/callback`;
-
-  const { data, error } = await admin.auth.admin.generateLink({
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: "magiclink",
     email: DEMO_EMAIL,
-    options: {
-      redirectTo: callbackUrl,
-    },
   });
 
-  if (error || !data?.properties?.action_link) {
+  if (linkError || !linkData?.properties?.hashed_token) {
     return NextResponse.json(
       {
         error: "demo_link_failed",
-        message: error?.message ?? "could not generate demo link",
+        message: linkError?.message ?? "Couldn't generate demo session.",
       },
       { status: 500 }
     );
   }
 
-  // Redirect through Supabase's auth verification URL — sets cookie and
-  // routes to /auth/callback?code=… which exchanges for a session and
-  // routes to /app
-  return NextResponse.redirect(data.properties.action_link);
+  const server = await supabaseServer();
+  const { error: verifyError } = await server.auth.verifyOtp({
+    token_hash: linkData.properties.hashed_token,
+    type: "magiclink",
+  });
+
+  if (verifyError) {
+    return NextResponse.json(
+      {
+        error: "demo_verify_failed",
+        message: verifyError.message,
+      },
+      { status: 500 }
+    );
+  }
+
+  // Auth cookie is now on this response. Redirect to the dashboard.
+  return NextResponse.redirect(new URL("/app", _req.url));
 }
