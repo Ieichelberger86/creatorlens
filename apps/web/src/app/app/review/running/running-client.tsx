@@ -3,21 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Step = {
-  step: string;
-  label: string;
-  ts: number;
-  data?: Record<string, unknown>;
-};
+type Step = { step: string; label: string; ts: number };
 
-const PHASES: Array<{ match: string; phase: string; emoji: string; weight: number }> = [
-  { match: "scrape", phase: "Pulling your videos", emoji: "📥", weight: 25 },
-  { match: "voice", phase: "Distilling your voice", emoji: "🎙️", weight: 15 },
-  { match: "audit", phase: "Writing your audit", emoji: "📝", weight: 30 },
-  { match: "goals", phase: "Setting 90-day goals", emoji: "🎯", weight: 30 },
+const PHASES: Array<{ match: string; phase: string; weight: number }> = [
+  { match: "scrape", phase: "Pulling last week's posts", weight: 35 },
+  { match: "analyze", phase: "Analyzing performance", weight: 20 },
+  { match: "write", phase: "Writing your review + plan", weight: 45 },
 ];
 
-export function RunningClient() {
+export function ReviewRunningClient() {
   const router = useRouter();
   const [steps, setSteps] = useState<Step[]>([]);
   const [phase, setPhase] = useState<string>("Starting up");
@@ -35,13 +29,12 @@ export function RunningClient() {
 
     (async () => {
       try {
-        // Slow auto-progress while we wait for real events (caps at 90%)
         pctRunner = setInterval(() => {
           if (cancelled) return;
           setPct((p) => Math.min(90, p + 1));
         }, 1500);
 
-        const res = await fetch("/api/onboarding/run", {
+        const res = await fetch("/api/review/run-now", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({}),
@@ -69,30 +62,24 @@ export function RunningClient() {
             if (!line) continue;
             try {
               const event = JSON.parse(line) as
-                | { type: "step"; step: string; label: string; data?: Record<string, unknown> }
-                | { type: "done"; review_id: string | null }
+                | { type: "step"; step: string; label: string }
+                | { type: "done"; review_id: string | null; week_starting: string }
                 | { type: "error"; message: string };
 
               if (event.type === "step") {
                 if (cancelled) continue;
                 setSteps((prev) => [
                   ...prev,
-                  {
-                    step: event.step,
-                    label: event.label,
-                    ts: Date.now(),
-                    data: event.data,
-                  },
+                  { step: event.step, label: event.label, ts: Date.now() },
                 ]);
-
-                // Update phase + nudge progress forward
                 const matched = PHASES.find((p) => event.step.startsWith(p.match));
                 if (matched) {
                   setPhase(matched.phase);
-                  // Bump pct to roughly where this phase lands
                   const idx = PHASES.indexOf(matched);
-                  const cumWeight =
-                    PHASES.slice(0, idx + 1).reduce((s, p) => s + p.weight, 0);
+                  const cumWeight = PHASES.slice(0, idx + 1).reduce(
+                    (s, p) => s + p.weight,
+                    0
+                  );
                   setPct((p) => Math.max(p, Math.min(90, cumWeight - 5)));
                 }
               } else if (event.type === "done") {
@@ -145,18 +132,16 @@ export function RunningClient() {
       <div className="relative z-10 flex flex-1 flex-col">
         <div className="mb-2 inline-flex items-center gap-2 self-start rounded-full border border-border bg-bg-elevated px-3 py-1 text-xs text-fg-muted">
           <span className="h-1.5 w-1.5 rounded-full bg-accent animate-glow" />
-          Building your account
+          Running your weekly review
         </div>
         <h1 className="mb-2 font-display text-3xl font-bold tracking-tight">
           {phase}…
         </h1>
         <p className="mb-6 text-sm text-fg-muted">
-          Lens is pulling your videos, learning your voice, writing a structured
-          audit, and breaking your 90-day vision into goals with action plans.
-          Hang tight — usually 60–90 seconds.
+          Pulling last week&apos;s posts, comparing against your goals, and
+          writing your next 7-day plan. Usually 60–90 seconds.
         </p>
 
-        {/* Big progress bar */}
         <div className="mb-2 flex items-center justify-between text-[11px] text-fg-subtle">
           <span className="font-mono">{pct.toFixed(0)}%</span>
           <span className="font-mono">{elapsedSec}s</span>
@@ -168,7 +153,6 @@ export function RunningClient() {
           />
         </div>
 
-        {/* Live event log */}
         <div className="flex flex-col gap-2 rounded-xl border border-border bg-bg-elevated/40 p-4">
           {steps.length === 0 ? (
             <div className="text-xs text-fg-subtle">
@@ -177,7 +161,6 @@ export function RunningClient() {
             </div>
           ) : (
             steps.map((s, i) => {
-              const isWarn = s.step.endsWith("_warn");
               const isLast = i === steps.length - 1;
               const isPast = i < steps.length - 1;
               return (
@@ -185,7 +168,7 @@ export function RunningClient() {
                   key={i}
                   className={
                     "flex items-start gap-3 text-sm " +
-                    (isWarn ? "text-warning" : isPast ? "text-fg-muted" : "text-fg")
+                    (isPast ? "text-fg-muted" : "text-fg")
                   }
                 >
                   <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-mono">
@@ -213,8 +196,8 @@ export function RunningClient() {
         ) : null}
 
         <div className="mt-auto pt-8 text-center text-[11px] text-fg-subtle">
-          You can stay on this page — we&apos;ll route you to chat the moment
-          your audit is ready.
+          Stay on this page — we&apos;ll route you to the fresh review when
+          it&apos;s ready.
         </div>
       </div>
     </main>

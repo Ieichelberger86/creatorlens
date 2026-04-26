@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runProfileAudit } from "@/lib/lens/audit";
 import { setGoalsFromAudit } from "@/lib/lens/goal-setter";
+import { generateWeeklyReview } from "@/lib/lens/weekly-review";
 
 export const runtime = "nodejs";
 // Match the long-running budget on the page: audit 30-60s + goals 30-60s.
@@ -121,7 +122,6 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        let goalsBlock = "";
         if (audit.ok) {
           send({ type: "step", step: "goals", label: "Setting your 90-day goals + action plans…" });
           try {
@@ -134,7 +134,6 @@ export async function POST(req: NextRequest) {
               audit: audit.opener,
               baseline: audit.baseline,
             });
-            goalsBlock = goalsRes.goalsSummaryMarkdown;
             send({
               type: "step",
               step: "goals_done",
@@ -145,33 +144,12 @@ export async function POST(req: NextRequest) {
             send({
               type: "step",
               step: "goals_warn",
-              label: `Couldn't auto-set goals (${e instanceof Error ? e.message : String(e)}). You can ask Lens later.`,
+              label: `Couldn't auto-set goals (${e instanceof Error ? e.message : String(e)}). Set them later from /app/goals.`,
             });
           }
         }
 
-        const fullOpener = audit.opener + goalsBlock;
-
-        // Persist final state: conversation + onboarded_at
-        const now = new Date().toISOString();
-        const { data: conv } = await admin
-          .from("conversations")
-          .insert({
-            user_id: user.id,
-            channel: "web",
-            title: audit.ok ? "Profile audit + goals" : "Welcome",
-            messages: [
-              {
-                role: "assistant",
-                content: fullOpener,
-                created_at: now,
-              },
-            ],
-            last_message_at: now,
-          })
-          .select("id")
-          .single();
-
+        // Mark onboarded so the weekly-review generator can run
         await admin
           .from("creator_profile")
           .update({
@@ -180,9 +158,43 @@ export async function POST(req: NextRequest) {
           })
           .eq("user_id", user.id);
 
+        // Generate the first weekly review (acts as the welcome message —
+        // contains last week's recap if they posted, plus 5-7 video ideas
+        // pre-loaded into the calendar).
+        send({
+          type: "step",
+          step: "review",
+          label: "Generating your first weekly plan…",
+        });
+
+        let reviewId: string | null = null;
+        try {
+          const review = await generateWeeklyReview({ userId: user.id });
+          reviewId = review.reviewId;
+          if (review.ok) {
+            send({
+              type: "step",
+              step: "review_done",
+              label: "Plan ready",
+            });
+          } else {
+            send({
+              type: "step",
+              step: "review_warn",
+              label: `Couldn't generate the plan (${review.reason ?? "unknown"}). Goals + audit still saved — run the review manually from settings.`,
+            });
+          }
+        } catch (e) {
+          send({
+            type: "step",
+            step: "review_warn",
+            label: `Plan generator hit an error (${e instanceof Error ? e.message : String(e)}). Run it manually from settings.`,
+          });
+        }
+
         send({
           type: "done",
-          conversation_id: conv?.id ?? null,
+          review_id: reviewId,
           label: "Ready",
         });
         controller.close();

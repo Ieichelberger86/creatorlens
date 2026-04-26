@@ -1,33 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import {
-  createNewConversation,
-  createConversationFromPrompt,
-} from "./conversations/actions";
 
 type Command = {
   id: string;
   label: string;
   hint?: string;
   icon: string;
-  /** Either a route to navigate to, or a function to invoke. */
   run: () => void | Promise<void>;
-  group: "navigate" | "ask" | "account";
+  group: "actions" | "navigate" | "account";
   keywords?: string;
 };
 
 /**
- * Global command palette — Cmd/Ctrl+K from any /app/* page.
- * Mounted in the AppLayout so it's available everywhere.
+ * Global Cmd/Ctrl+K palette.
  *
- * Two kinds of commands:
- * - Navigate: jump to a section (Home, Goals, Calendar, etc.)
- * - Ask: pre-fills a chat prompt and opens a fresh conversation
- *   (e.g. "Generate 10 hooks", "Find trending posts")
- * - Account: Settings, Sign out
+ * Action-oriented. No "ask Lens" anymore — this app runs on a weekly
+ * cadence, not chat. Primary actions: run a fresh review now, jump to
+ * the latest review, edit settings, etc.
  */
 export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
@@ -35,10 +27,29 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [pending, start] = useTransition();
 
   const commands = useMemo<Command[]>(() => {
     const list: Command[] = [
+      // Actions
+      {
+        id: "run-review",
+        label: "Run a fresh review",
+        hint: "regenerate this week's plan",
+        icon: "🔁",
+        group: "actions",
+        run: () => router.push("/app/review/running" as Route),
+        keywords: "weekly plan refresh",
+      },
+      {
+        id: "rerun-audit",
+        label: "Run a fresh full-profile audit",
+        hint: "scrape full history, ~2 minutes",
+        icon: "📋",
+        group: "actions",
+        run: () => router.push("/app/audit/running" as Route),
+        keywords: "audit refresh history",
+      },
+
       // Navigate
       {
         id: "nav-home",
@@ -49,12 +60,12 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
         keywords: "dashboard today",
       },
       {
-        id: "nav-chat",
-        label: "Open chat",
-        icon: "💬",
+        id: "nav-reviews",
+        label: "Weekly reviews",
+        icon: "📋",
         group: "navigate",
-        run: () => router.push("/app/chat" as Route),
-        keywords: "lens conversation",
+        run: () => router.push("/app/review" as Route),
+        keywords: "history past",
       },
       {
         id: "nav-goals",
@@ -88,82 +99,6 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
         keywords: "stats analytics numbers",
       },
 
-      // Quick "ask Lens" actions — open a new chat with the prompt pre-fired
-      {
-        id: "ask-hooks",
-        label: "Generate 10 hooks",
-        hint: "for my next video",
-        icon: "🎣",
-        group: "ask",
-        run: () => fireChatPrompt("Generate 10 hook variants for my next video — pick the highest-leverage angle from my recent winners."),
-        keywords: "hook idea brainstorm opener",
-      },
-      {
-        id: "ask-trends",
-        label: "Find trending posts",
-        hint: "in my niche this week",
-        icon: "📈",
-        group: "ask",
-        run: () => fireChatPrompt("Find trending TikTok posts in my niche this week I could ride."),
-        keywords: "trending viral",
-      },
-      {
-        id: "ask-set-goals",
-        label: "Set my goals",
-        hint: "from my latest audit",
-        icon: "🎯",
-        group: "ask",
-        run: () =>
-          fireChatPrompt(
-            "Set my 90-day goals from my latest audit. Decompose them into 1-3 measurable goals with action plans."
-          ),
-        keywords: "ninety 90 day plan",
-      },
-      {
-        id: "ask-postmortem",
-        label: "Score a recent post",
-        hint: "I'll paste the URL",
-        icon: "🔍",
-        group: "ask",
-        run: () =>
-          fireChatPrompt(
-            "I'm going to paste a TikTok URL — analyze it, then run a brutal post-mortem against my baseline."
-          ),
-        keywords: "post mortem analyze video",
-      },
-      {
-        id: "ask-deal",
-        label: "Review a brand pitch",
-        hint: "I'll paste the email",
-        icon: "🤝",
-        group: "ask",
-        run: () =>
-          fireChatPrompt(
-            "I'll paste a brand pitch in my next message — check for scam patterns, extract the real terms, and draft a recommended response in my voice."
-          ),
-        keywords: "scam vet sponsorship pitch",
-      },
-      {
-        id: "new-chat",
-        label: "Start a new chat",
-        hint: "blank slate",
-        icon: "➕",
-        group: "ask",
-        run: async () => {
-          await createNewConversation();
-        },
-        keywords: "blank fresh",
-      },
-      {
-        id: "rerun-audit",
-        label: "Run a fresh audit",
-        hint: "full profile, ~2 minutes",
-        icon: "🔁",
-        group: "ask",
-        run: () => router.push("/app/audit/running" as Route),
-        keywords: "audit refresh redo update",
-      },
-
       // Account
       {
         id: "nav-settings",
@@ -178,7 +113,6 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
         icon: "↩",
         group: "account",
         run: () => {
-          // Submit the existing form action via fetch
           void fetch("/auth/sign-out", { method: "POST" }).then(() => {
             window.location.href = "/login";
           });
@@ -196,12 +130,6 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
       });
     }
     return list;
-
-    function fireChatPrompt(prompt: string) {
-      const fd = new FormData();
-      fd.set("message", prompt);
-      start(async () => void (await createConversationFromPrompt(fd)));
-    }
   }, [router, isAdmin]);
 
   const filtered = useMemo(() => {
@@ -213,12 +141,10 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
     });
   }, [commands, query]);
 
-  // Reset active index when filter changes
   useEffect(() => {
     setActiveIndex(0);
   }, [query]);
 
-  // Global Cmd/Ctrl+K listener
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const cmd = e.metaKey || e.ctrlKey;
@@ -233,7 +159,6 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Focus the input when opening
   useEffect(() => {
     if (open) {
       setQuery("");
@@ -264,9 +189,8 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
 
   if (!open) return null;
 
-  // Group commands by section for display
   const groups: Record<Command["group"], Command[]> = {
-    ask: [],
+    actions: [],
     navigate: [],
     account: [],
   };
@@ -344,7 +268,7 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onInputKey}
-              placeholder="Type a command — Goals, Hooks, Sign out…"
+              placeholder="Type a command — Review, Goals, Sign out…"
               className="flex-1 bg-transparent text-sm text-fg placeholder:text-fg-subtle focus:outline-none"
             />
             <kbd className="rounded border border-border bg-bg px-1.5 py-0.5 font-mono text-[10px] text-fg-subtle">
@@ -359,7 +283,7 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
               </div>
             ) : (
               <>
-                {renderGroup("Ask Lens", groups.ask)}
+                {renderGroup("Actions", groups.actions)}
                 {renderGroup("Navigate", groups.navigate)}
                 {renderGroup("Account", groups.account)}
               </>
@@ -374,7 +298,7 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
               run
             </span>
             <span className="font-mono">
-              {pending ? "Working…" : `${filtered.length} command${filtered.length === 1 ? "" : "s"}`}
+              {filtered.length} command{filtered.length === 1 ? "" : "s"}
             </span>
           </div>
         </div>

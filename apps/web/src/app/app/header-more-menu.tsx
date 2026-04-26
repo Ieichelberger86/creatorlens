@@ -33,7 +33,6 @@ export function HeaderMoreMenu({ isAdmin }: { isAdmin: boolean }) {
     });
   }
 
-  // Active if any of these pages is the current path
   const sectionActive = items.some((it) => it.match(path));
 
   useEffect(() => {

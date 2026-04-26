@@ -17,10 +17,7 @@ import {
   updateCalendarEntryTool,
   updateCalendarEntryExecutor,
 } from "./update-calendar-entry.js";
-import {
-  generateThumbnailTool,
-  generateThumbnailExecutor,
-} from "./generate-thumbnail.js";
+// generate_thumbnail removed — product no longer ships thumbnail generation.
 import {
   reviewBrandDealTool,
   reviewBrandDealExecutor,
@@ -61,7 +58,6 @@ export const TOOLS: Anthropic.Tool[] = [
   draftCommentReplyTool,
   postMortemTool,
   repurposeVideoTool,
-  generateThumbnailTool,
   reviewBrandDealTool,
   planLiveShowTool,
   recordLiveRecapTool,
@@ -82,7 +78,6 @@ export const EXECUTORS: Record<string, ToolExecutor> = {
   draft_comment_reply: draftCommentReplyExecutor,
   post_mortem: postMortemExecutor,
   repurpose_video: repurposeVideoExecutor,
-  generate_thumbnail: generateThumbnailExecutor,
   review_brand_deal: reviewBrandDealExecutor,
   plan_live_show: planLiveShowExecutor,
   record_live_recap: recordLiveRecapExecutor,

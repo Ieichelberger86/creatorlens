@@ -8,9 +8,9 @@ import { HeaderMoreMenu } from "./header-more-menu";
 const PRIMARY: Array<{ href: Route; label: string; match: (p: string) => boolean }> = [
   { href: "/app" as Route, label: "Home", match: (p) => p === "/app" },
   {
-    href: "/app/chat" as Route,
-    label: "Chat",
-    match: (p) => p === "/app/chat" || p.startsWith("/app/c/"),
+    href: "/app/review" as Route,
+    label: "Reviews",
+    match: (p) => p.startsWith("/app/review"),
   },
 ];
 

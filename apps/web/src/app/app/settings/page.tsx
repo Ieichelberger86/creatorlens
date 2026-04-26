@@ -34,6 +34,15 @@ export default async function SettingsPage() {
       .maybeSingle(),
   ]);
 
+  // Latest weekly review (drives the Weekly Review settings card)
+  const { data: latestReview } = await admin
+    .from("weekly_reviews")
+    .select("id, week_starting, generated_at")
+    .eq("user_id", user.id)
+    .order("week_starting", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   if (!profile?.onboarded_at) {
     redirect("/app/onboarding");
   }
@@ -74,24 +83,40 @@ export default async function SettingsPage() {
 
       <section className="mt-8 rounded-xl border border-border bg-bg-elevated/40 p-5">
         <h2 className="mb-3 font-display text-sm font-semibold uppercase tracking-wider text-fg-muted">
-          Audit
+          Weekly review
         </h2>
         <p className="mb-4 text-sm text-fg-muted">
-          Lens runs a fresh full-profile audit during onboarding. You can
-          re-run one any time to update your baseline — pulls up to 100
-          videos, refreshes your voice samples, and writes a new audit
-          message in a fresh chat.
+          Lens runs a structured review every Monday at 8am UTC: last
+          week&apos;s recap + 5-7 video ideas pre-loaded into your calendar
+          (with hooks, descriptions, and hashtags). Run one manually any time.
         </p>
 
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Stat
-            label="Last audit"
+            label="Latest review"
+            value={
+              latestReview
+                ? `Week of ${new Date(
+                    (latestReview.week_starting as string) + "T00:00:00Z"
+                  ).toLocaleDateString(undefined, {
+                    month: "long",
+                    day: "numeric",
+                  })}`
+                : "—"
+            }
+            sub={
+              latestReview
+                ? `Generated ${new Date(latestReview.generated_at as string).toLocaleDateString()}`
+                : "First one runs Monday 8am UTC, or run now"
+            }
+          />
+          <Stat
+            label="Last full audit"
             value={
               lastAuditDate
                 ? lastAuditDate.toLocaleDateString(undefined, {
                     month: "long",
                     day: "numeric",
-                    year: "numeric",
                   })
                 : "—"
             }
@@ -101,29 +126,25 @@ export default async function SettingsPage() {
                 : undefined
             }
           />
-          <Stat
-            label="Renewable"
-            value={eligible ? "Yes — run any time" : "Soon"}
-            sub={
-              !eligible && eligibleAt
-                ? `Available ${eligibleAt.toLocaleDateString(undefined, {
-                    month: "long",
-                    day: "numeric",
-                  })}`
-                : undefined
-            }
-            tone={eligible ? "ok" : "muted"}
-          />
         </div>
 
-        <Link
-          href={"/app/audit/running" as Route}
-          className="btn-primary text-sm inline-flex items-center gap-2"
-        >
-          🔁 Run a fresh audit now
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={"/app/review/running" as Route}
+            className="btn-primary text-sm inline-flex items-center gap-2"
+          >
+            🔁 Run weekly review now
+          </Link>
+          <Link
+            href={"/app/audit/running" as Route}
+            className="btn-secondary text-sm inline-flex items-center gap-2"
+          >
+            📋 Run full audit
+          </Link>
+        </div>
         <p className="mt-2 text-[11px] text-fg-subtle">
-          Takes 90–180 seconds. Lands in a new chat when done.
+          Weekly review: ~60-90s. Full audit: ~90-180s (covers up to 100
+          videos, refreshes baseline + voice).
         </p>
       </section>
     </PageShell>

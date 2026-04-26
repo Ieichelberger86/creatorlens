@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import {
   createCalendarEntry,
   deleteCalendarEntry,
@@ -8,7 +10,7 @@ import {
   rescheduleEntry,
   updateCalendarStatus,
 } from "./actions";
-import { StartChatButton } from "../start-chat-button";
+// StartChatButton removed — chat is gone, replaced by weekly reviews.
 
 export type CalendarRow = {
   id: string;
@@ -243,14 +245,19 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         rows manually below.
       </p>
       <div className="flex flex-wrap justify-center gap-2">
-        <StartChatButton
-          prompt="Brainstorm 5 video ideas for me this week. Use my niche + voice samples + recent winners. Then offer to schedule the strongest 3."
-          label="Ask Lens for 5 ideas"
-        />
+        <Link
+          href={"/app/review/running" as Route}
+          className="btn-primary text-sm"
+        >
+          🔁 Run my weekly review
+        </Link>
         <button onClick={onCreate} className="btn-secondary text-sm">
           + Add manually
         </button>
       </div>
+      <p className="mt-3 text-xs text-fg-subtle">
+        Each Monday Lens generates 5-7 video ideas and pre-loads them here.
+      </p>
     </div>
   );
 }

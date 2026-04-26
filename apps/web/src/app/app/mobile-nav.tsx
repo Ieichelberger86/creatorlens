@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
-import { createNewConversation } from "./conversations/actions";
 
 type Item = {
   href: Route;
@@ -16,16 +15,21 @@ type Item = {
 const TABS: Item[] = [
   { href: "/app" as Route, label: "Home", icon: "🏠", match: (p) => p === "/app" },
   {
-    href: "/app/chat" as Route,
-    label: "Chat",
-    icon: "💬",
-    match: (p) => p === "/app/chat" || p.startsWith("/app/c/"),
+    href: "/app/review" as Route,
+    label: "Reviews",
+    icon: "📋",
+    match: (p) => p.startsWith("/app/review"),
+  },
+  {
+    href: "/app/calendar" as Route,
+    label: "Calendar",
+    icon: "📅",
+    match: (p) => p.startsWith("/app/calendar"),
   },
 ];
 
 const MORE: Item[] = [
   { href: "/app/goals" as Route, label: "Goals", icon: "🎯", match: (p) => p.startsWith("/app/goals") },
-  { href: "/app/calendar" as Route, label: "Calendar", icon: "📅", match: (p) => p.startsWith("/app/calendar") },
   { href: "/app/brand-deals" as Route, label: "Brand deals", icon: "🤝", match: (p) => p.startsWith("/app/brand-deals") },
   { href: "/app/insights" as Route, label: "Insights", icon: "📊", match: (p) => p.startsWith("/app/insights") },
   { href: "/app/settings" as Route, label: "Settings", icon: "⚙️", match: (p) => p.startsWith("/app/settings") },
@@ -34,16 +38,9 @@ const MORE: Item[] = [
 export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
   const path = usePathname() ?? "/app";
   const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
-
-  // Hide the bottom tab bar inside the chat (it overlaps the composer)
-  const hidden = path.startsWith("/app/c/");
-
-  if (hidden) return null;
 
   return (
     <>
-      {/* Bottom tab bar — fixed at the bottom on mobile */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around border-t border-border bg-bg-elevated/95 backdrop-blur sm:hidden">
         {TABS.map((tab) => {
           const active = tab.match(path);
@@ -62,17 +59,6 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
           );
         })}
 
-        {/* New chat button — wide center pill */}
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => start(async () => void (await createNewConversation()))}
-          className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] text-accent transition hover:text-fg disabled:opacity-50"
-        >
-          <span className="text-lg leading-none">➕</span>
-          <span>New chat</span>
-        </button>
-
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -87,7 +73,6 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
         </button>
       </nav>
 
-      {/* Bottom-up sheet for "More" */}
       {open ? (
         <>
           <div
@@ -158,7 +143,6 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
         </>
       ) : null}
 
-      {/* Reserve space above the fixed tab bar so content isn't covered */}
       <div className="h-16 sm:hidden" />
     </>
   );

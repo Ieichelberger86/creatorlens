@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -8,7 +10,7 @@ import {
   recordGoalProgress,
   deleteGoal,
 } from "./actions";
-import { StartChatButton } from "../start-chat-button";
+// StartChatButton removed — chat is gone, replaced by weekly reviews.
 
 export type GoalRow = {
   id: string;
@@ -81,10 +83,16 @@ export function GoalsClient({ rows }: { rows: GoalRow[] }) {
               + 90-day vision. If yours got skipped or you want to refocus,
               one click and we&apos;re on it.
             </p>
-            <StartChatButton
-              prompt="Set my 90-day goals from my latest audit. Decompose them into 1-3 measurable goals with action plans."
-              label="Set my goals →"
-            />
+            <Link
+              href={"/app/onboarding" as Route}
+              className="btn-primary text-sm"
+            >
+              Set my goals →
+            </Link>
+            <p className="mt-2 text-xs text-fg-subtle">
+              Goals are normally set automatically during onboarding from your
+              audit. If yours are empty, re-run onboarding.
+            </p>
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-bg-elevated/40 p-10 text-center text-fg-muted">
