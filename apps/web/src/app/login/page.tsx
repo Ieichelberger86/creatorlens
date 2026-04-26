@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 type PageProps = {
-  searchParams: Promise<{ sent?: string; error?: string; email?: string }>;
+  searchParams: Promise<{ error?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: PageProps) {
@@ -30,31 +30,14 @@ export default async function LoginPage({ searchParams }: PageProps) {
       </Link>
 
       <div className="card relative z-10 w-full text-center">
-        {sp.sent === "1" ? (
-          <>
-            <h1 className="mb-2 font-display text-2xl font-semibold">
-              Check your email
-            </h1>
-            <p className="mb-4 text-sm text-fg-muted">
-              We sent a magic link to{" "}
-              <span className="font-mono text-fg">{sp.email}</span>. Click it to
-              sign in. The link expires in 15 minutes.
-            </p>
-            <Link href="/login" className="text-sm text-accent hover:text-accent-hover">
-              Use a different email
-            </Link>
-          </>
-        ) : (
-          <>
-            <h1 className="mb-2 font-display text-2xl font-semibold">
-              Log in to your Lens
-            </h1>
-            <p className="mb-6 text-sm text-fg-muted">
-              Enter your email. We&apos;ll send you a one-click sign-in link.
-            </p>
-            <LoginForm errorCode={sp.error} />
-          </>
-        )}
+        <h1 className="mb-2 font-display text-2xl font-semibold">
+          Log in to your Lens
+        </h1>
+        <p className="mb-6 text-sm text-fg-muted">
+          Enter your email. We&apos;ll log you in instantly — no password
+          or magic link required.
+        </p>
+        <LoginForm errorCode={sp.error} />
       </div>
 
       <div className="relative z-10 mt-6 flex flex-col items-center gap-3 text-center">
