@@ -30,8 +30,8 @@ export default async function ReviewListPage() {
     <PageShell
       routeLabel="/app/review"
       title="Weekly reviews"
-      subtitle="Lens runs a structured review every Monday — last week's recap + next week's plan. Click any week to read it."
-      actions={<RunReviewButton variant="secondary" label="🔁 Run now" />}
+      subtitle="Last week + next week, every Monday."
+      actions={<RunReviewButton variant="secondary" label="Run now" />}
     >
       {error ? (
         <div className="mb-6 rounded-lg border border-danger/40 bg-danger/5 p-4 text-sm text-danger">
@@ -43,8 +43,7 @@ export default async function ReviewListPage() {
         <div className="rounded-xl border border-border bg-bg-elevated/40 p-8 text-center">
           <div className="mb-2 text-3xl">📋</div>
           <p className="mb-4 text-sm text-fg-muted">
-            No reviews yet. Your first one will land Monday at 8am UTC, or
-            run one now.
+            No reviews yet. Mondays 8am UTC, or run now.
           </p>
           <RunReviewButton />
         </div>

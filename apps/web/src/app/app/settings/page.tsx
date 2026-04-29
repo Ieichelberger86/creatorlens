@@ -76,7 +76,7 @@ export default async function SettingsPage() {
     <PageShell
       routeLabel="/app/settings"
       title="Settings"
-      subtitle="Update what Lens knows about you. Changes apply to the next message and any new tool runs."
+      subtitle="What Lens knows about you."
       width="narrow"
     >
       <SettingsForm initial={initial} />
@@ -86,9 +86,7 @@ export default async function SettingsPage() {
           Weekly review
         </h2>
         <p className="mb-4 text-sm text-fg-muted">
-          Lens runs a structured review every Monday at 8am UTC: last
-          week&apos;s recap + 5-7 video ideas pre-loaded into your calendar
-          (with hooks, descriptions, and hashtags). Run one manually any time.
+          Mondays 8am UTC. Or run one now.
         </p>
 
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -131,20 +129,19 @@ export default async function SettingsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={"/app/review/running" as Route}
-            className="btn-primary text-sm inline-flex items-center gap-2"
+            className="btn-primary text-sm"
           >
-            🔁 Run weekly review now
+            Run review
           </Link>
           <Link
             href={"/app/audit/running" as Route}
-            className="btn-secondary text-sm inline-flex items-center gap-2"
+            className="btn-secondary text-sm"
           >
-            📋 Run full audit
+            Run audit
           </Link>
         </div>
         <p className="mt-2 text-[11px] text-fg-subtle">
-          Weekly review: ~60-90s. Full audit: ~90-180s (covers up to 100
-          videos, refreshes baseline + voice).
+          Review ~60s · Audit ~120s (full profile rescan)
         </p>
       </section>
     </PageShell>

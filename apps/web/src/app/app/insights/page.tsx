@@ -54,7 +54,7 @@ export default async function InsightsPage() {
     <PageShell
       routeLabel="/app/insights"
       title="Your numbers"
-      subtitle={`Built from ${rows.length} of your videos. Lens references this on every reply.`}
+      subtitle={`From your last ${rows.length} videos.`}
       width="wide"
     >
       {error ? (
@@ -221,22 +221,14 @@ function EmptyState() {
     <div className="card text-center">
       <div className="mb-2 text-3xl">📊</div>
       <h2 className="mb-2 font-display text-xl font-semibold">
-        Your stats fill in as Lens analyzes your videos.
+        No stats yet.
       </h2>
       <p className="mx-auto mb-6 max-w-md text-sm text-fg-muted">
-        If you just signed up, your last 10 videos should already be here —
-        if this still shows empty, the scrape probably hit a private/region-
-        locked profile. Run a post-mortem on a recent post or drop a URL in
-        chat to fill in.
+        Run a fresh audit to populate.
       </p>
-      <div className="flex flex-wrap justify-center gap-2">
-        <Link href={"/app" as Route} className="btn-primary text-sm">
-          Run a post-mortem
-        </Link>
-        <Link href={"/app/calendar" as Route} className="btn-secondary text-sm">
-          Plan content instead
-        </Link>
-      </div>
+      <Link href={"/app/audit/running" as Route} className="btn-primary text-sm">
+        Run audit
+      </Link>
     </div>
   );
 }

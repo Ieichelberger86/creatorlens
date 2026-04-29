@@ -101,8 +101,7 @@ export function BrandDealsClient({
             Brand deals
           </h1>
           <p className="mt-1 text-sm text-fg-muted">
-            Paste any offer — Lens checks for scams, summarizes the terms, and
-            drafts your response.
+            Paste any pitch — scams flagged, terms extracted, reply drafted.
           </p>
         </div>
         <button
@@ -152,15 +151,13 @@ function EmptyState({ onSubmit }: { onSubmit: () => void }) {
     <div className="card text-center">
       <div className="mb-2 text-3xl">🤝</div>
       <div className="mb-2 font-display text-xl font-semibold">
-        Vet every brand deal that lands in your DMs.
+        No deals reviewed.
       </div>
       <p className="mx-auto mb-6 max-w-md text-sm text-fg-muted">
-        Lens flags scams (upfront fees, crypto payment, vague brands), extracts
-        the real terms, and drafts your reply in your voice. Paste a pitch
-        here, or just send it to Lens in chat — &ldquo;is this legit?&rdquo;
+        Paste any pitch. Scams flagged, terms extracted, reply drafted.
       </p>
       <button onClick={onSubmit} className="btn-primary text-sm">
-        + Review a deal
+        Review a deal
       </button>
     </div>
   );

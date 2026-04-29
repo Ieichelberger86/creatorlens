@@ -43,14 +43,13 @@ export default async function OnboardingPage() {
       <div className="relative z-10">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border bg-bg-elevated px-3 py-1 text-xs text-fg-muted">
           <span className="h-1.5 w-1.5 rounded-full bg-accent animate-glow" />
-          One time, ~30 seconds
+          ~30 seconds
         </div>
         <h1 className="mb-3 font-display text-2xl font-bold tracking-tight sm:text-3xl sm:text-4xl">
-          Three things, then meet Lens.
+          Quick setup.
         </h1>
         <p className="mb-8 text-sm text-fg-muted">
-          Lens uses these to write in your voice from message one. You can
-          change anything later.
+          Change anything later.
         </p>
 
         <OnboardingForm />

@@ -132,15 +132,12 @@ export function ReviewRunningClient() {
       <div className="relative z-10 flex flex-1 flex-col">
         <div className="mb-2 inline-flex items-center gap-2 self-start rounded-full border border-border bg-bg-elevated px-3 py-1 text-xs text-fg-muted">
           <span className="h-1.5 w-1.5 rounded-full bg-accent animate-glow" />
-          Running your weekly review
+          Weekly review
         </div>
         <h1 className="mb-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
           {phase}…
         </h1>
-        <p className="mb-6 text-sm text-fg-muted">
-          Pulling last week&apos;s posts, comparing against your goals, and
-          writing your next 7-day plan. Usually 60–90 seconds.
-        </p>
+        <p className="mb-6 text-sm text-fg-muted">~60 seconds.</p>
 
         <div className="mb-2 flex items-center justify-between text-[11px] text-fg-subtle">
           <span className="font-mono">{pct.toFixed(0)}%</span>
@@ -196,8 +193,7 @@ export function ReviewRunningClient() {
         ) : null}
 
         <div className="mt-auto pt-8 text-center text-[11px] text-fg-subtle">
-          Stay on this page — we&apos;ll route you to the fresh review when
-          it&apos;s ready.
+          Stay here — we&apos;ll route you when it&apos;s done.
         </div>
       </div>
     </main>

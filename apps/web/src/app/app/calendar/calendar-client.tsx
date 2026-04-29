@@ -240,27 +240,22 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
     <div className="card text-center">
       <div className="mb-2 text-3xl">📅</div>
       <div className="mb-2 font-display text-xl font-semibold">
-        Your content pipeline lives here.
+        Calendar is empty.
       </div>
       <p className="mb-6 text-sm text-fg-muted">
-        Lens schedules videos when you say &ldquo;queue this for Tuesday at
-        6pm&rdquo; or pick a hook and pull it into a script. You can also add
-        rows manually below.
+        Run a weekly review — 5-7 ideas land here automatically.
       </p>
       <div className="flex flex-wrap justify-center gap-2">
         <Link
           href={"/app/review/running" as Route}
           className="btn-primary text-sm"
         >
-          🔁 Run my weekly review
+          Run review
         </Link>
         <button onClick={onCreate} className="btn-secondary text-sm">
-          + Add manually
+          + Add
         </button>
       </div>
-      <p className="mt-3 text-xs text-fg-subtle">
-        Each Monday Lens generates 5-7 video ideas and pre-loads them here.
-      </p>
     </div>
   );
 }

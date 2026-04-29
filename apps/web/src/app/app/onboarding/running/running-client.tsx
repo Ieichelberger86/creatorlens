@@ -145,16 +145,12 @@ export function RunningClient() {
       <div className="relative z-10 flex flex-1 flex-col">
         <div className="mb-2 inline-flex items-center gap-2 self-start rounded-full border border-border bg-bg-elevated px-3 py-1 text-xs text-fg-muted">
           <span className="h-1.5 w-1.5 rounded-full bg-accent animate-glow" />
-          Building your account
+          Setting up
         </div>
         <h1 className="mb-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
           {phase}…
         </h1>
-        <p className="mb-6 text-sm text-fg-muted">
-          Lens is pulling your videos, learning your voice, writing a structured
-          audit, and breaking your 90-day vision into goals with action plans.
-          Hang tight — usually 60–90 seconds.
-        </p>
+        <p className="mb-6 text-sm text-fg-muted">~90 seconds.</p>
 
         {/* Big progress bar */}
         <div className="mb-2 flex items-center justify-between text-[11px] text-fg-subtle">
@@ -213,8 +209,7 @@ export function RunningClient() {
         ) : null}
 
         <div className="mt-auto pt-8 text-center text-[11px] text-fg-subtle">
-          You can stay on this page — we&apos;ll route you to chat the moment
-          your audit is ready.
+          Stay here — we&apos;ll route you when it&apos;s done.
         </div>
       </div>
     </main>

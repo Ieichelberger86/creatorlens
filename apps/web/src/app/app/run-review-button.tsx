@@ -13,7 +13,7 @@ import type { Route } from "next";
  */
 export function RunReviewButton({
   variant = "primary",
-  label = "🔁 Run my review now",
+  label = "Run review",
 }: {
   variant?: "primary" | "secondary";
   label?: string;

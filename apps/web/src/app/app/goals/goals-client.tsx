@@ -76,22 +76,19 @@ export function GoalsClient({ rows }: { rows: GoalRow[] }) {
           <div className="rounded-xl border border-border bg-bg-elevated/40 p-8 text-center">
             <div className="mb-2 text-3xl">🎯</div>
             <h2 className="mb-2 font-display text-lg font-semibold">
-              No active goals yet.
+              No active goals.
             </h2>
             <p className="mx-auto mb-5 max-w-md text-sm text-fg-muted">
-              Lens sets goals automatically during onboarding from your audit
-              + 90-day vision. If yours got skipped or you want to refocus,
-              one click and we&apos;re on it.
+              Set during onboarding from your audit.
             </p>
             <Link
               href={"/app/onboarding" as Route}
               className="btn-primary text-sm"
             >
-              Set my goals →
+              Re-run onboarding →
             </Link>
             <p className="mt-2 text-xs text-fg-subtle">
-              Goals are normally set automatically during onboarding from your
-              audit. If yours are empty, re-run onboarding.
+              Re-runs your audit and sets goals.
             </p>
           </div>
         ) : (

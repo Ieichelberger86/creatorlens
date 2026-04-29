@@ -78,8 +78,7 @@ export default async function AgencyPage() {
           Agency control plane
         </h1>
         <p className="mt-1 text-sm text-fg-muted">
-          One screen to see who&apos;s shipping, who&apos;s ghosting, who needs a
-          nudge.
+          Who&apos;s shipping. Who&apos;s ghosting.
         </p>
       </header>
 

@@ -38,28 +38,27 @@ export function OnboardingForm() {
       />
 
       <FieldArea
-        label="Your niche, in your own words"
+        label="Your niche"
         name="niche"
-        placeholder="real estate investor making content for first-time investors who feel priced out of the market"
+        placeholder="real estate investor making content for first-time buyers"
         rows={2}
-        helper="One sentence. Specific beats clever — what would you tell a stranger at a bar?"
+        helper="One sentence. Specific beats clever."
         error={state.fieldErrors?.niche}
       />
 
       <FieldArea
-        label="What does winning look like in 90 days?"
+        label="90-day goal"
         name="ninety_day_goal"
-        placeholder="hit 50K followers, land 2 brand deals, and turn one viral video into a paid course"
+        placeholder="hit 50K followers and land 2 brand deals"
         rows={2}
-        helper="Concrete and measurable beats vague."
+        helper="Numbers beat vibes."
         error={state.fieldErrors?.ninety_day_goal}
       />
 
       <fieldset className="text-sm text-fg-muted">
-        <legend className="mb-2">How do you make money from TikTok?</legend>
+        <legend className="mb-2">How you make money</legend>
         <p className="mb-3 text-xs text-fg-subtle">
-          Pick everything you&apos;re actively going after. Lens uses this on
-          every recommendation — different streams need different hooks.
+          Pick all that apply.
         </p>
         <div className="flex flex-col gap-2">
           {STREAM_OPTIONS.map((opt) => {
@@ -108,15 +107,11 @@ export function OnboardingForm() {
       ) : null}
 
       <button type="submit" disabled={pending} className="btn-primary mt-2">
-        {pending
-          ? "Running your audit… (~45s)"
-          : "Run my audit →"}
+        {pending ? "Starting…" : "Continue →"}
       </button>
 
       <p className="text-center text-[11px] text-fg-subtle">
-        Lens pulls your last 10 TikToks, distills your voice, and writes a
-        structured audit — what&apos;s working, what isn&apos;t, three
-        experiments to run this week — by the time you land in chat.
+        Audit + 90-day goals + first weekly plan. ~90 seconds.
       </p>
     </form>
   );

@@ -31,11 +31,10 @@ export default async function LoginPage({ searchParams }: PageProps) {
 
       <div className="card relative z-10 w-full text-center">
         <h1 className="mb-2 font-display text-2xl font-semibold">
-          Log in to your Lens
+          Log in
         </h1>
         <p className="mb-6 text-sm text-fg-muted">
-          Enter your email. We&apos;ll log you in instantly — no password
-          or magic link required.
+          Email only. No password.
         </p>
         <LoginForm errorCode={sp.error} />
       </div>

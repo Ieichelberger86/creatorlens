@@ -79,7 +79,7 @@ export function SettingsForm({ initial: data }: { initial: SettingsInitial }) {
           name="ninety_day_goal"
           rows={2}
           defaultValue={data.ninety_day_goal}
-          helper="Concrete and measurable beats vague."
+          helper="Numbers beat vibes."
           error={state.fieldErrors?.ninety_day_goal}
         />
         <FieldArea
@@ -88,16 +88,15 @@ export function SettingsForm({ initial: data }: { initial: SettingsInitial }) {
           rows={3}
           defaultValue={data.brand_notes}
           required={false}
-          helper="Anything Lens should always remember — taboos, tone rules, personal positioning, recurring themes."
+          helper="Tone rules, taboos, recurring themes."
           error={state.fieldErrors?.brand_notes}
         />
       </Section>
 
-      <Section title="How do you make money?">
+      <Section title="How you make money">
         <fieldset className="text-sm text-fg-muted">
           <p className="mb-3 text-xs text-fg-subtle">
-            Lens uses this on every recommendation — different streams need
-            different hooks.
+            Pick all that apply.
           </p>
           <div className="flex flex-col gap-2">
             {STREAM_OPTIONS.map((opt) => {
@@ -144,8 +143,7 @@ export function SettingsForm({ initial: data }: { initial: SettingsInitial }) {
 
       <Section title="Voice samples">
         <p className="text-xs text-fg-subtle">
-          Phrases or one-liners Lens should mimic when writing in your voice.
-          Up to 10. The first 3 are weighted heaviest.
+          Phrases Lens should mimic. Up to 10. First 3 weighted heaviest.
         </p>
         <div className="flex flex-col gap-2">
           {voice.map((v, i) => (

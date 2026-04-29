@@ -31,7 +31,7 @@ export default async function GoalsPage() {
     <PageShell
       routeLabel="/app/goals"
       title="Your 90-day goals"
-      subtitle="Set during onboarding from your audit + 90-day vision. Lens uses these to bias every recommendation."
+      subtitle="Set during onboarding."
     >
       {error ? (
         <div className="mb-6 rounded-lg border border-danger/40 bg-danger/5 p-4 text-sm text-danger">

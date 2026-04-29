@@ -154,15 +154,14 @@ function ReviewView({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-4">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-accent/80">
-            This week&apos;s review
+            This week
           </div>
           <div className="mt-0.5 font-display text-lg font-semibold">
-            Week of {formatWeek(review.week_starting)}
+            {formatWeek(review.week_starting)}
           </div>
           <div className="mt-0.5 text-xs text-fg-subtle">
-            Generated {timeAgo(review.generated_at)} ·{" "}
-            {review.videos_analyzed ?? 0} video
-            {(review.videos_analyzed ?? 0) === 1 ? "" : "s"} analyzed
+            {timeAgo(review.generated_at)} · {review.videos_analyzed ?? 0} video
+            {(review.videos_analyzed ?? 0) === 1 ? "" : "s"}
           </div>
         </div>
         <RunReviewButton />
@@ -187,7 +186,7 @@ function ReviewView({
         <section>
           <SectionHead
             title="This week"
-            link={{ href: "/app/calendar", label: "Plan in calendar →" }}
+            link={{ href: "/app/calendar", label: "Calendar →" }}
           />
           <div className="rounded-xl border border-border bg-bg-elevated/40 p-5">
             {review.this_week_plan ? (
@@ -261,12 +260,10 @@ function NoReviewYet() {
     <div className="rounded-2xl border border-border bg-bg-elevated/40 p-8 text-center">
       <div className="mb-2 text-3xl">📋</div>
       <h2 className="mb-2 font-display text-xl font-semibold">
-        Your first weekly review will land here.
+        First review lands here.
       </h2>
       <p className="mx-auto mb-5 max-w-md text-sm text-fg-muted">
-        Lens runs your review every Monday at 8am UTC: pulls last week&apos;s
-        posts, compares against your goals, and writes a specific plan for
-        the next 7 days. You can also run one manually any time.
+        Mondays 8am UTC. Or run one now.
       </p>
       <RunReviewButton />
     </div>
