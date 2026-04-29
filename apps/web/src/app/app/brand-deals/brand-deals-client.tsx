@@ -94,10 +94,10 @@ export function BrandDealsClient({
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-      <header className="mb-8 flex items-center justify-between">
-        <div>
+      <header className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="font-mono text-xs text-fg-subtle">/app/brand-deals</div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">
+          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
             Brand deals
           </h1>
           <p className="mt-1 text-sm text-fg-muted">
@@ -108,7 +108,7 @@ export function BrandDealsClient({
         <button
           type="button"
           onClick={() => setOpenSubmit(true)}
-          className="btn-primary text-sm"
+          className="btn-primary self-start text-sm sm:self-auto sm:shrink-0"
         >
           + Review a deal
         </button>
@@ -307,7 +307,7 @@ function DetailModal({
         </div>
 
         {deal.ai_summary ? (
-          <div className="prose prose-sm prose-invert max-w-none">
+          <div className="prose prose-sm prose-invert max-w-none break-words">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {deal.ai_summary}
             </ReactMarkdown>

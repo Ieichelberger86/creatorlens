@@ -23,7 +23,7 @@ export default async function AgencyPage() {
 
   if (error) {
     return (
-      <main className="mx-auto w-full max-w-6xl px-6 py-10">
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <h1 className="font-display text-2xl font-bold">Agency</h1>
         <p className="mt-4 text-sm text-danger">DB error: {error.message}</p>
       </main>
@@ -71,10 +71,10 @@ export default async function AgencyPage() {
   const totalLive30d = rows.reduce((s, r) => s + r.live_shows_30d, 0);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-6 py-10">
+    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
       <header className="mb-8">
         <div className="font-mono text-xs text-fg-subtle">/admin/agency</div>
-        <h1 className="font-display text-3xl font-bold tracking-tight">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
           Agency control plane
         </h1>
         <p className="mt-1 text-sm text-fg-muted">

@@ -34,7 +34,7 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-xl flex-1 flex-col px-6 py-10">
+    <main className="relative mx-auto flex w-full max-w-xl flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-[400px] hero-glow"
@@ -45,7 +45,7 @@ export default async function OnboardingPage() {
           <span className="h-1.5 w-1.5 rounded-full bg-accent animate-glow" />
           One time, ~30 seconds
         </div>
-        <h1 className="mb-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+        <h1 className="mb-3 font-display text-2xl font-bold tracking-tight sm:text-3xl sm:text-4xl">
           Three things, then meet Lens.
         </h1>
         <p className="mb-8 text-sm text-fg-muted">

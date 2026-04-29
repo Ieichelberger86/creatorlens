@@ -62,7 +62,7 @@ export default async function ReviewDetailPage({
             Last week
           </div>
           {review.last_week_summary ? (
-            <div className="prose prose-sm prose-invert max-w-none">
+            <div className="prose prose-sm prose-invert max-w-none break-words">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {review.last_week_summary as string}
               </ReactMarkdown>
@@ -77,7 +77,7 @@ export default async function ReviewDetailPage({
             This week
           </div>
           {review.this_week_plan ? (
-            <div className="prose prose-sm prose-invert max-w-none">
+            <div className="prose prose-sm prose-invert max-w-none break-words">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {review.this_week_plan as string}
               </ReactMarkdown>

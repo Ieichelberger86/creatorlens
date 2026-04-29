@@ -82,22 +82,22 @@ export default async function AdminPage() {
   const pctOfTarget = Math.min(100, Math.round((total / target) * 100));
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 py-10">
-      <header className="mb-10 flex items-center justify-between">
-        <div>
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <header className="mb-8 flex flex-col gap-3 sm:mb-10 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="font-mono text-xs text-fg-subtle">/admin</div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">
+          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
             CreatorLens pre-orders
           </h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href={"/admin/agency" as Route}
             className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs text-accent hover:bg-accent/20"
           >
-            → Agency control plane
+            → Agency
           </Link>
-          <div className="font-mono text-xs text-fg-subtle">
+          <div className="hidden font-mono text-xs text-fg-subtle md:block">
             {new Date().toISOString()}
           </div>
         </div>
@@ -148,8 +148,8 @@ export default async function AdminPage() {
             {usersErr}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-bg-elevated text-left text-xs uppercase tracking-wider text-fg-subtle">
                 <tr>
                   <th className="px-4 py-3">Email</th>
@@ -227,8 +227,8 @@ export default async function AdminPage() {
         <div className="mb-3 font-display text-lg font-semibold">
           Recent pre-orders
         </div>
-        <div className="overflow-hidden rounded-xl border border-border">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-bg-elevated text-left text-xs uppercase tracking-wider text-fg-subtle">
               <tr>
                 <th className="px-4 py-3">Email</th>

@@ -103,7 +103,7 @@ export default async function LensAppPage() {
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6">
       <header className="mb-6">
         <div className="font-mono text-xs text-fg-subtle">{today}</div>
-        <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">
+        <h1 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">
           {handle ? `@${handle}` : "Welcome back"}
         </h1>
       </header>
@@ -173,7 +173,7 @@ function ReviewView({
           <SectionHead title="Last week" />
           <div className="rounded-xl border border-border bg-bg-elevated/40 p-5">
             {review.last_week_summary ? (
-              <div className="prose prose-sm prose-invert max-w-none">
+              <div className="prose prose-sm prose-invert max-w-none break-words">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {review.last_week_summary}
                 </ReactMarkdown>
@@ -191,7 +191,7 @@ function ReviewView({
           />
           <div className="rounded-xl border border-border bg-bg-elevated/40 p-5">
             {review.this_week_plan ? (
-              <div className="prose prose-sm prose-invert max-w-none">
+              <div className="prose prose-sm prose-invert max-w-none break-words">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {review.this_week_plan}
                 </ReactMarkdown>

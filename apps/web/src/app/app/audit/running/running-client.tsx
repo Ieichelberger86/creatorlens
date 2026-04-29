@@ -134,7 +134,7 @@ export function AuditRunningClient() {
   const elapsedSec = Math.floor((Date.now() - startedAt.current) / 1000);
 
   return (
-    <main className="relative mx-auto flex min-h-[calc(100dvh-57px)] w-full max-w-xl flex-1 flex-col px-6 py-10">
+    <main className="relative mx-auto flex min-h-[calc(100dvh-57px)] w-full max-w-xl flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-[400px] hero-glow"
@@ -144,7 +144,7 @@ export function AuditRunningClient() {
           <span className="h-1.5 w-1.5 rounded-full bg-accent animate-glow" />
           Re-running your audit
         </div>
-        <h1 className="mb-2 font-display text-3xl font-bold tracking-tight">
+        <h1 className="mb-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
           {phase}…
         </h1>
         <p className="mb-6 text-sm text-fg-muted">

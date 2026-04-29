@@ -77,17 +77,17 @@ export function CalendarClient({
   const groups = useMemo(() => groupRows(initial), [initial]);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-8">
-      <header className="mb-8 flex items-center justify-between">
+    <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <header className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="font-mono text-xs text-fg-subtle">/app/calendar</div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">
+          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
             Content calendar
           </h1>
         </div>
         <button
           type="button"
-          className="btn-primary text-sm"
+          className="btn-primary self-start text-sm sm:self-auto"
           onClick={() => setOpenCreate(true)}
         >
           + Add entry
@@ -201,7 +201,7 @@ function Group({
             <button
               type="button"
               onClick={() => onOpen(r.id)}
-              className={`group flex w-full items-start gap-4 rounded-xl border border-border bg-bg-elevated px-4 py-3 text-left transition hover:border-border-subtle hover:bg-bg-subtle ${
+              className={`group flex w-full items-start gap-3 rounded-xl border border-border bg-bg-elevated px-3 py-3 text-left transition hover:border-border-subtle hover:bg-bg-subtle sm:gap-4 sm:px-4 ${
                 muted ? "opacity-70" : ""
               }`}
             >
@@ -214,14 +214,17 @@ function Group({
                 {r.status}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="font-medium">{r.title}</div>
+                <div className="break-words font-medium">{r.title}</div>
                 {r.hook ? (
                   <div className="mt-0.5 truncate text-sm text-fg-muted">
                     “{r.hook}”
                   </div>
                 ) : null}
+                <div className="mt-1 font-mono text-[11px] text-fg-subtle sm:hidden">
+                  {fmt(r.scheduled_for ?? r.posted_at)}
+                </div>
               </div>
-              <div className="shrink-0 text-right font-mono text-xs text-fg-muted">
+              <div className="hidden shrink-0 text-right font-mono text-xs text-fg-muted sm:block">
                 {fmt(r.scheduled_for ?? r.posted_at)}
               </div>
             </button>

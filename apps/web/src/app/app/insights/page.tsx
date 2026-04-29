@@ -165,8 +165,8 @@ export default async function InsightsPage() {
 
           <section className="mb-10">
             <SectionHead title="Best performers" sub="Top 5 by views" />
-            <div className="overflow-hidden rounded-xl border border-border">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead className="bg-bg-elevated text-left text-xs uppercase tracking-wider text-fg-subtle">
                   <tr>
                     <th className="px-4 py-3">Caption / hook</th>
